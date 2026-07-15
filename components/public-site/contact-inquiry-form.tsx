@@ -7,12 +7,18 @@ import { toast } from "sonner"
 
 import {
   createContactInquiryAction,
-  initialContactInquiryFormState,
+  type ContactInquiryFormState,
 } from "@/app/architecture/contact/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+
+const initialContactInquiryFormState: ContactInquiryFormState = {
+  status: "idle",
+  message: "",
+  submittedAt: 0,
+}
 
 export function ContactInquiryForm() {
   const formRef = useRef<HTMLFormElement>(null)
@@ -38,7 +44,7 @@ export function ContactInquiryForm() {
   }, [state])
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-5">
+    <form ref={formRef} action={formAction} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
@@ -47,7 +53,7 @@ export function ContactInquiryForm() {
             name="name"
             placeholder="Your name"
             required
-            className="h-11 bg-background/60 shadow-none"
+            className="h-11 !bg-background shadow-none"
           />
         </div>
         <div className="space-y-2">
@@ -58,7 +64,7 @@ export function ContactInquiryForm() {
             type="tel"
             placeholder="Phone number"
             required
-            className="h-11 bg-background/60 shadow-none"
+            className="h-11 !bg-background shadow-none"
           />
         </div>
       </div>
@@ -71,7 +77,7 @@ export function ContactInquiryForm() {
             name="city"
             placeholder="City"
             required
-            className="h-11 bg-background/60 shadow-none"
+            className="h-11 !bg-background shadow-none"
           />
         </div>
         <div className="space-y-2">
@@ -81,7 +87,7 @@ export function ContactInquiryForm() {
             name="pincode"
             inputMode="numeric"
             placeholder="Pincode"
-            className="h-11 bg-background/60 shadow-none"
+            className="h-11 !bg-background shadow-none"
           />
         </div>
       </div>
@@ -93,11 +99,16 @@ export function ContactInquiryForm() {
           name="message"
           placeholder="Tell us about the site, scope, or space you want to design."
           required
-          className="min-h-36 bg-background/60 shadow-none"
+          className="min-h-36 !bg-background shadow-none"
         />
       </div>
 
-      <Button type="submit" size="lg" disabled={pending} className="w-full">
+      <Button
+        type="submit"
+        size="lg"
+        disabled={pending}
+        className="w-full sm:w-auto sm:px-6"
+      >
         <SendIcon className="size-4" />
         {pending ? "Sending" : "Send inquiry"}
       </Button>

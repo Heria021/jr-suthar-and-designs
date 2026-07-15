@@ -5,7 +5,12 @@ import { updateSession } from "@/lib/supabase/proxy"
 const AUTHENTICATED_ROUTE = "/dashboard"
 
 function isPublicRoute(pathname: string) {
-  return pathname === "/" || pathname.startsWith("/projects/")
+  return (
+    pathname === "/" ||
+    pathname === "/architecture" ||
+    pathname.startsWith("/architecture/") ||
+    pathname.startsWith("/projects/")
+  )
 }
 
 function isAuthRoute(pathname: string) {

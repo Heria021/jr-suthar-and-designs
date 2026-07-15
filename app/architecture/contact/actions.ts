@@ -11,12 +11,6 @@ export type ContactInquiryFormState = {
   submittedAt: number
 }
 
-export const initialContactInquiryFormState: ContactInquiryFormState = {
-  status: "idle",
-  message: "",
-  submittedAt: 0,
-}
-
 function fieldValue(formData: FormData, key: string) {
   const value = formData.get(key)
 
