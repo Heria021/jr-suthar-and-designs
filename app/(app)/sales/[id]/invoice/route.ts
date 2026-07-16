@@ -13,6 +13,7 @@ type InvoiceFonts = {
   regular: string
   bold: string
   italic: string
+  money: string
 }
 
 function money(value: number) {
@@ -60,26 +61,23 @@ async function readPublicJpegDataUri(publicPath: string) {
   return `data:image/jpeg;base64,${image.toString("base64")}`
 }
 
-async function registerInvoiceFont(doc: PDFKit.PDFDocument): Promise<InvoiceFonts> {
-  const fontPath = path.join(
+async function invoiceFonts(doc: PDFKit.PDFDocument): Promise<InvoiceFonts> {
+  const moneyFontPath = path.join(
     process.cwd(),
     "node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf"
   )
-  const font = await readFile(fontPath).catch(() => null)
+  const moneyFont = await readFile(moneyFontPath).catch(() => null)
+  const money = moneyFont ? "InvoiceMoney" : "Helvetica"
 
-  if (!font) {
-    return {
-      regular: "Helvetica",
-      bold: "Helvetica-Bold",
-      italic: "Helvetica-Oblique",
-    }
+  if (moneyFont) {
+    doc.registerFont(money, moneyFont)
   }
 
-  doc.registerFont("InvoiceRegular", font)
   return {
-    regular: "InvoiceRegular",
-    bold: "InvoiceRegular",
-    italic: "InvoiceRegular",
+    regular: "Helvetica",
+    bold: "Helvetica-Bold",
+    italic: "Helvetica-Oblique",
+    money,
   }
 }
 
@@ -128,19 +126,19 @@ function drawFooter({
   const right = 566
   const width = right - left
 
-  const paymentY = footerY + 12
+  const paymentY = footerY + 10
   doc.moveTo(left, footerY).lineTo(right, footerY).strokeColor("#111111").stroke()
 
   doc.font(fonts.regular).fontSize(8).fillColor("#444444").text("BANK DETAILS", left, paymentY, {
     characterSpacing: 0.8,
   })
   doc.font(fonts.regular).fontSize(8.8).fillColor("#111111")
-  doc.text(`Bank Name: ${businessProfile.bank.name}`, left, paymentY + 17)
-  doc.text(`A/C Name: ${businessProfile.bank.accountName}`, left, paymentY + 32)
-  doc.text(`Account No: ${businessProfile.bank.accountNumber}`, left, paymentY + 47)
-  doc.text(`IFSC Code: ${businessProfile.bank.ifsc}`, left, paymentY + 62)
+  doc.text(`Bank Name: ${businessProfile.bank.name}`, left, paymentY + 14)
+  doc.text(`A/C Name: ${businessProfile.bank.accountName}`, left, paymentY + 27)
+  doc.text(`Account No: ${businessProfile.bank.accountNumber}`, left, paymentY + 40)
+  doc.text(`IFSC Code: ${businessProfile.bank.ifsc}`, left, paymentY + 53)
 
-  const qrSize = 76
+  const qrSize = 68
   const qrX = right - qrSize
   const qrTextX = qrX - 150
   doc.font(fonts.regular).fontSize(8).fillColor("#444444").text("UPI PAYMENT", qrTextX, paymentY, {
@@ -149,32 +147,33 @@ function drawFooter({
     characterSpacing: 0.8,
   })
   doc.font(fonts.bold).fontSize(11).fillColor("#111111")
-  doc.text(money(dueAmount), qrTextX, paymentY + 18, {
+  doc.font(fonts.money).fontSize(11)
+  doc.text(money(dueAmount), qrTextX, paymentY + 15, {
     width: 132,
     align: "right",
   })
   doc.font(fonts.regular).fontSize(8.5).fillColor("#555555")
-  doc.text("Scan QR to pay Narayani Traders", qrTextX, paymentY + 38, {
+  doc.text("Scan QR to pay Narayani Traders", qrTextX, paymentY + 34, {
     width: 132,
     align: "right",
     lineGap: 1,
   })
   if (qrImage) {
-    doc.image(qrImage, qrX, paymentY + 2, { width: qrSize })
+    doc.image(qrImage, qrX, paymentY + 1, { width: qrSize })
   }
 
-  const termsY = footerY + 162
-  doc.moveTo(left, footerY + 150).lineTo(right, footerY + 150).dash(3, { space: 3 }).strokeColor("#111111").stroke().undash()
+  const termsY = footerY + 96
+  doc.moveTo(left, footerY + 86).lineTo(right, footerY + 86).dash(3, { space: 3 }).strokeColor("#111111").stroke().undash()
   doc.font(fonts.regular).fontSize(8).fillColor("#444444")
   doc.text("TERMS & CONDITIONS", left, termsY, {
     characterSpacing: 0.8,
   })
   doc.font(fonts.regular).fontSize(8.5).fillColor("#111111")
-  doc.text("- Goods once sold will not be taken back or exchanged without prior approval.", left, termsY + 15)
-  doc.text("- Payment for Udhaar bills is due within 30 days of invoice date.", left, termsY + 28)
+  doc.text("- Goods once sold will not be taken back or exchanged without prior approval.", left, termsY + 13)
+  doc.text("- Payment for Udhaar bills is due within 30 days of invoice date.", left, termsY + 25)
 
   doc.font(fonts.italic).fontSize(9).fillColor("#555555")
-  doc.text("Thank you for your business!", left, termsY + 50, {
+  doc.text("Thank you for your business!", left, termsY + 44, {
     width,
     align: "center",
   })
@@ -189,7 +188,7 @@ export async function GET(
   const invoice = await getSaleInvoiceData(id)
   const qrImage = await readPublicJpegDataUri(businessProfile.payment.qrPublicPath)
   const doc = new PDFDocument({ size: "A4", margin: 28 })
-  const fonts = await registerInvoiceFont(doc)
+  const fonts = await invoiceFonts(doc)
   const chunks: Buffer[] = []
 
   doc.on("data", (chunk: Buffer) => chunks.push(chunk))
@@ -283,6 +282,7 @@ export async function GET(
       centeredTextY(doc, quantityText, rowTop, rowHeight, 82),
       82
     )
+    doc.font(fonts.money)
     textRight(
       doc,
       rateText,
@@ -291,7 +291,7 @@ export async function GET(
       65
     )
 
-    doc.font(fonts.bold)
+    doc.font(fonts.money)
     textRight(
       doc,
       amountText,
@@ -322,48 +322,55 @@ export async function GET(
   const sx = 330
   doc.font(fonts.regular).fontSize(10)
   doc.text("Subtotal", sx, y)
+  doc.font(fonts.money).fontSize(10)
   textRight(doc, money(invoice.sale.subtotal), 450, y, 110)
   y += 24
+  doc.font(fonts.regular).fontSize(10)
   doc.text("Discount", sx, y)
+  doc.font(fonts.money).fontSize(10)
   textRight(doc, `- ${money(invoice.sale.discount_amount)}`, 450, y, 110)
   y += 22
-  doc.moveTo(sx, y).lineTo(566, y).stroke()
+  doc.moveTo(sx, y).lineTo(566, y).lineWidth(1.5).stroke().lineWidth(1)
   y += 14
-  doc.font(fonts.bold).fontSize(13).text("Grand Total", sx, y)
+  doc.font(fonts.bold).fontSize(14).text("Grand Total", sx, y)
+  doc.font(fonts.money).fontSize(14)
   textRight(doc, money(invoice.sale.total_amount), 450, y, 110)
   y += 24
   doc.moveTo(sx, y).lineTo(566, y).lineWidth(1.5).stroke().lineWidth(1)
   y += 14
-  doc.font(fonts.regular).fontSize(10).text("Amount Paid", sx, y)
+  doc.font(fonts.regular).fontSize(10)
+  doc.text("Amount Paid", sx, y)
+  doc.font(fonts.money).fontSize(10)
   textRight(doc, `- ${money(invoice.balance.paid_amount)}`, 450, y, 110)
   if (invoice.balance.show_previous_balance) {
     y += 22
+    doc.font(fonts.regular).fontSize(10)
     doc.text("Previous Balance", sx, y)
+    doc.font(fonts.money).fontSize(10)
     textRight(doc, money(invoice.balance.previous_due_amount), 450, y, 110)
   }
-  y += 26
-  doc.font(fonts.bold).text("Balance Due", sx, y)
+  y += 20
+  doc.moveTo(sx, y).lineTo(566, y).dash(3, { space: 3 }).stroke().undash()
+  y += 10
+  doc.font(fonts.bold).fontSize(12).text("Balance Due", sx, y)
+  doc.font(fonts.money).fontSize(12)
   textRight(doc, money(invoice.balance.total_due_amount), 450, y, 110)
+  y += 20
+  doc.moveTo(sx, y).lineTo(566, y).dash(3, { space: 3 }).stroke().undash()
 
-  const footerY = 636
+  const footerHeight = 150
+  const pageBottom = 812
+  const footerY = pageBottom - footerHeight
   if (y + 28 > footerY) {
     doc.addPage()
-    drawFooter({
-      doc,
-      footerY,
-      qrImage,
-      dueAmount: invoice.balance.total_due_amount,
-      fonts,
-    })
-  } else {
-    drawFooter({
-      doc,
-      footerY,
-      qrImage,
-      dueAmount: invoice.balance.total_due_amount,
-      fonts,
-    })
   }
+  drawFooter({
+    doc,
+    footerY,
+    qrImage,
+    dueAmount: invoice.balance.total_due_amount,
+    fonts,
+  })
 
   doc.end()
   const pdf = await done
