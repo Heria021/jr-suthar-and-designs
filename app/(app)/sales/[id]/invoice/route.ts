@@ -83,8 +83,8 @@ async function invoiceFonts(doc: PDFKit.PDFDocument): Promise<InvoiceFonts> {
 
 function drawItemsHeader(doc: PDFKit.PDFDocument, y: number, fonts: InvoiceFonts) {
   doc.save()
-  doc.moveTo(28, y - 7).lineTo(566, y - 7).strokeColor("#111111").stroke()
-  doc.moveTo(28, y + 16).lineTo(566, y + 16).strokeColor("#111111").stroke()
+  doc.moveTo(28, y - 6).lineTo(566, y - 6).strokeColor("#111111").stroke()
+  doc.moveTo(28, y + 14).lineTo(566, y + 14).strokeColor("#111111").stroke()
   doc.fillColor("#444444").font(fonts.regular).fontSize(8)
   doc.text("Sr", 38, y)
   doc.text("PRODUCT", 68, y)
@@ -92,7 +92,7 @@ function drawItemsHeader(doc: PDFKit.PDFDocument, y: number, fonts: InvoiceFonts
   textRight(doc, "RATE", 420, y, 65)
   textRight(doc, "AMOUNT", 495, y, 60)
   doc.restore()
-  return y + 25
+  return y + 22
 }
 
 function ensurePageRoom(
@@ -126,19 +126,19 @@ function drawFooter({
   const right = 566
   const width = right - left
 
-  const paymentY = footerY + 10
+  const paymentY = footerY + 8
   doc.moveTo(left, footerY).lineTo(right, footerY).strokeColor("#111111").stroke()
 
   doc.font(fonts.regular).fontSize(8).fillColor("#444444").text("BANK DETAILS", left, paymentY, {
     characterSpacing: 0.8,
   })
   doc.font(fonts.regular).fontSize(8.8).fillColor("#111111")
-  doc.text(`Bank Name: ${businessProfile.bank.name}`, left, paymentY + 14)
-  doc.text(`A/C Name: ${businessProfile.bank.accountName}`, left, paymentY + 27)
-  doc.text(`Account No: ${businessProfile.bank.accountNumber}`, left, paymentY + 40)
-  doc.text(`IFSC Code: ${businessProfile.bank.ifsc}`, left, paymentY + 53)
+  doc.text(`Bank Name: ${businessProfile.bank.name}`, left, paymentY + 13)
+  doc.text(`A/C Name: ${businessProfile.bank.accountName}`, left, paymentY + 25)
+  doc.text(`Account No: ${businessProfile.bank.accountNumber}`, left, paymentY + 37)
+  doc.text(`IFSC Code: ${businessProfile.bank.ifsc}`, left, paymentY + 49)
 
-  const qrSize = 68
+  const qrSize = 64
   const qrX = right - qrSize
   const qrTextX = qrX - 150
   doc.font(fonts.regular).fontSize(8).fillColor("#444444").text("UPI PAYMENT", qrTextX, paymentY, {
@@ -162,20 +162,21 @@ function drawFooter({
     doc.image(qrImage, qrX, paymentY + 1, { width: qrSize })
   }
 
-  const termsY = footerY + 96
-  doc.moveTo(left, footerY + 86).lineTo(right, footerY + 86).dash(3, { space: 3 }).strokeColor("#111111").stroke().undash()
+  const termsY = footerY + 88
+  doc.moveTo(left, footerY + 79).lineTo(right, footerY + 79).dash(3, { space: 3 }).strokeColor("#111111").stroke().undash()
   doc.font(fonts.regular).fontSize(8).fillColor("#444444")
   doc.text("TERMS & CONDITIONS", left, termsY, {
     characterSpacing: 0.8,
   })
   doc.font(fonts.regular).fontSize(8.5).fillColor("#111111")
-  doc.text("- Goods once sold will not be taken back or exchanged without prior approval.", left, termsY + 13)
-  doc.text("- Payment for Udhaar bills is due within 30 days of invoice date.", left, termsY + 25)
+  doc.text("- Goods once sold will not be taken back or exchanged without prior approval.", left, termsY + 12)
+  doc.text("- Payment for Udhaar bills is due within 30 days of invoice date.", left, termsY + 23)
 
-  doc.font(fonts.italic).fontSize(9).fillColor("#555555")
-  doc.text("Thank you for your business!", left, termsY + 44, {
+  doc.font(fonts.italic).fontSize(8).fillColor("#555555")
+  doc.text("Thank you for your business!", left, termsY + 38, {
     width,
     align: "center",
+    lineBreak: false,
   })
   doc.fillColor("#111111")
 }
@@ -200,54 +201,54 @@ export async function GET(
     dateStyle: "medium",
   }).format(new Date(invoice.sale.sale_date))
 
-  doc.font(fonts.bold).fontSize(20).text(businessProfile.name, 28, 32)
+  doc.font(fonts.bold).fontSize(18).text(businessProfile.name, 28, 30)
   doc.fontSize(8).text(businessProfile.tagline.toUpperCase(), 28, 58, {
     characterSpacing: 1.8,
   })
-  doc.font(fonts.regular).fontSize(10).text(`Phone: ${businessProfile.phone}`, 28, 76)
-  doc.text(`Email: ${businessProfile.email}`, 28, 92)
-  doc.font(fonts.bold).fontSize(9).text(`GSTIN: ${businessProfile.gstin}`, 28, 108)
+  doc.font(fonts.regular).fontSize(9).text(`Phone: ${businessProfile.phone}`, 28, 74)
+  doc.text(`Email: ${businessProfile.email}`, 28, 88)
+  doc.font(fonts.bold).fontSize(8.5).text(`GSTIN: ${businessProfile.gstin}`, 28, 102)
 
   doc.font(fonts.bold).fontSize(9)
   textRight(doc, "ESTIMATE INVOICE", 300, 34, 260)
   doc.fontSize(21)
-  textRight(doc, invoice.sale.sale_number, 300, 52, 260)
-  doc.font(fonts.regular).fontSize(11)
-  textRight(doc, `Date: ${invoiceDate}`, 300, 84, 260)
+  textRight(doc, invoice.sale.sale_number, 300, 50, 260)
+  doc.font(fonts.regular).fontSize(10)
+  textRight(doc, `Date: ${invoiceDate}`, 300, 80, 260)
   textRight(
     doc,
     `Status: ${invoice.balance.payment_status.replaceAll("_", " ")}`,
     300,
-    104,
+    98,
     260
   )
 
-  doc.lineWidth(1.5).moveTo(28, 132).lineTo(566, 132).stroke().lineWidth(1)
-  doc.font(fonts.bold).fontSize(8).text("FROM", 28, 148, { characterSpacing: 1.5 })
-  doc.fontSize(11).text(businessProfile.name, 28, 168)
-  doc.font(fonts.regular).fontSize(10)
+  doc.lineWidth(1.5).moveTo(28, 122).lineTo(566, 122).stroke().lineWidth(1)
+  doc.font(fonts.bold).fontSize(8).text("FROM", 28, 136, { characterSpacing: 1.5 })
+  doc.fontSize(10).text(businessProfile.name, 28, 154)
+  doc.font(fonts.regular).fontSize(9)
   businessProfile.addressLines.forEach((line, index) => {
-    doc.text(line, 28, 188 + index * 16)
+    doc.text(line, 28, 172 + index * 13)
   })
 
-  doc.font(fonts.bold).fontSize(8).text("BILL TO", 300, 148, { characterSpacing: 1.5 })
-  doc.fontSize(11).text(invoice.customer.name, 300, 168)
+  doc.font(fonts.bold).fontSize(8).text("BILL TO", 300, 136, { characterSpacing: 1.5 })
+  doc.fontSize(10).text(invoice.customer.name, 300, 154)
   doc.font(fonts.regular)
-  let billToY = 188
+  let billToY = 172
   if (invoice.customer.address) {
     const addressHeight = doc.heightOfString(invoice.customer.address, { width: 240 })
     doc.text(invoice.customer.address, 300, billToY, { width: 240 })
-    billToY += Math.max(16, addressHeight + 4)
+    billToY += Math.max(13, addressHeight + 3)
   }
   doc.text(`Phone: ${invoice.customer.phone ?? "-"}`, 300, billToY)
   if (invoice.customer.notes) {
-    doc.fillColor("#555555").text(`Notes: ${invoice.customer.notes}`, 300, billToY + 18, {
+    doc.fillColor("#555555").text(`Notes: ${invoice.customer.notes}`, 300, billToY + 15, {
       width: 240,
     })
     doc.fillColor("#000000")
   }
 
-  let y = drawItemsHeader(doc, 246, fonts)
+  let y = drawItemsHeader(doc, 226, fonts)
   invoice.items.forEach((item, index) => {
     const srText = String(index + 1).padStart(2, "0")
     const quantityText = quantityLabel(item)
@@ -257,10 +258,10 @@ export async function GET(
       .font(fonts.bold)
       .fontSize(9)
       .heightOfString(item.product_name_snapshot, { width: 230 })
-    const rowHeight = Math.max(24, descriptionHeight + 10)
+    const rowHeight = Math.max(20, descriptionHeight + 7)
     y = ensurePageRoom(doc, y, rowHeight, fonts)
 
-    const rowTop = y - 4
+    const rowTop = y - 3
     doc.font(fonts.regular).fontSize(9)
     doc.text(srText, 38, centeredTextY(doc, srText, rowTop, rowHeight, 24), {
       width: 24,
@@ -300,14 +301,14 @@ export async function GET(
       66
     )
     y += rowHeight
-    doc.moveTo(28, y - 4).lineTo(566, y - 4).strokeColor("#dddddd").stroke().strokeColor("#000000")
+    doc.moveTo(28, y - 3).lineTo(566, y - 3).strokeColor("#dddddd").stroke().strokeColor("#000000")
   })
 
   if (y > 500) {
     doc.addPage()
     y = 54
   } else {
-    y += 18
+    y += 12
   }
 
   if (invoice.sale.notes) {
@@ -320,45 +321,45 @@ export async function GET(
   }
 
   const sx = 330
-  doc.font(fonts.regular).fontSize(10)
+  doc.font(fonts.regular).fontSize(9)
   doc.text("Subtotal", sx, y)
-  doc.font(fonts.money).fontSize(10)
+  doc.font(fonts.money).fontSize(9)
   textRight(doc, money(invoice.sale.subtotal), 450, y, 110)
-  y += 24
-  doc.font(fonts.regular).fontSize(10)
+  y += 19
+  doc.font(fonts.regular).fontSize(9)
   doc.text("Discount", sx, y)
-  doc.font(fonts.money).fontSize(10)
+  doc.font(fonts.money).fontSize(9)
   textRight(doc, `- ${money(invoice.sale.discount_amount)}`, 450, y, 110)
-  y += 22
+  y += 17
   doc.moveTo(sx, y).lineTo(566, y).lineWidth(1.5).stroke().lineWidth(1)
-  y += 14
-  doc.font(fonts.bold).fontSize(14).text("Grand Total", sx, y)
-  doc.font(fonts.money).fontSize(14)
+  y += 10
+  doc.font(fonts.bold).fontSize(11).text("Grand Total", sx, y)
+  doc.font(fonts.money).fontSize(11)
   textRight(doc, money(invoice.sale.total_amount), 450, y, 110)
-  y += 24
+  y += 18
   doc.moveTo(sx, y).lineTo(566, y).lineWidth(1.5).stroke().lineWidth(1)
-  y += 14
-  doc.font(fonts.regular).fontSize(10)
+  y += 10
+  doc.font(fonts.regular).fontSize(9)
   doc.text("Amount Paid", sx, y)
-  doc.font(fonts.money).fontSize(10)
+  doc.font(fonts.money).fontSize(9)
   textRight(doc, `- ${money(invoice.balance.paid_amount)}`, 450, y, 110)
   if (invoice.balance.show_previous_balance) {
-    y += 22
-    doc.font(fonts.regular).fontSize(10)
+    y += 17
+    doc.font(fonts.regular).fontSize(9)
     doc.text("Previous Balance", sx, y)
-    doc.font(fonts.money).fontSize(10)
+    doc.font(fonts.money).fontSize(9)
     textRight(doc, money(invoice.balance.previous_due_amount), 450, y, 110)
   }
-  y += 20
+  y += 16
   doc.moveTo(sx, y).lineTo(566, y).dash(3, { space: 3 }).stroke().undash()
-  y += 10
-  doc.font(fonts.bold).fontSize(12).text("Balance Due", sx, y)
-  doc.font(fonts.money).fontSize(12)
+  y += 8
+  doc.font(fonts.bold).fontSize(10).text("Balance Due", sx, y)
+  doc.font(fonts.money).fontSize(10)
   textRight(doc, money(invoice.balance.total_due_amount), 450, y, 110)
-  y += 20
+  y += 16
   doc.moveTo(sx, y).lineTo(566, y).dash(3, { space: 3 }).stroke().undash()
 
-  const footerHeight = 150
+  const footerHeight = 135
   const pageBottom = 812
   const footerY = pageBottom - footerHeight
   if (y + 28 > footerY) {
