@@ -12,7 +12,6 @@ import {
 import { toast } from "sonner"
 
 import { reversePaymentModuleAction } from "@/app/(app)/payments/actions"
-import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
@@ -35,8 +34,11 @@ export type PaymentDetail = {
   contact_type: string
   direction: "in" | "out"
   amount: number
+  document_allocated_amount: number
+  opening_applied_amount: number
+  allocated_amount: number
+  remaining_amount: number
   payment_method: string
-  payment_date: string
   reference_number: string | null
   notes: string | null
   status: string
@@ -84,11 +86,9 @@ export function PaymentDetailClient({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [reason, setReason] = useState("")
-  const allocatedAmount = allocations.reduce(
-    (sum, allocation) => sum + allocation.allocated_amount,
-    0
-  )
-  const remainingAmount = Math.max(payment.amount - allocatedAmount, 0)
+  const documentAllocatedAmount = payment.document_allocated_amount
+  const openingAppliedAmount = payment.opening_applied_amount
+  const remainingAmount = payment.remaining_amount
   const canReverse =
     payment.status === "completed" &&
     !payment.reversed_payment_id &&
@@ -125,7 +125,7 @@ export function PaymentDetailClient({
           </div>
           <p className="max-w-xl text-sm text-muted-foreground">
             {payment.contact_name} ·{" "}
-            {dateFormatter.format(new Date(payment.payment_date))} ·{" "}
+            {dateFormatter.format(new Date(payment.created_at))} ·{" "}
             {methodLabel(payment.payment_method)}
           </p>
         </div>
@@ -143,23 +143,13 @@ export function PaymentDetailClient({
 
       <section className="grid gap-6 border-b border-border/40 pb-5 sm:grid-cols-4">
         <SummaryMetric label="Amount" value={money(payment.amount)} />
-        <SummaryMetric label="Allocated" value={money(allocatedAmount)} />
+        <SummaryMetric label="Bills" value={money(documentAllocatedAmount)} />
+        <SummaryMetric label="Opening" value={money(openingAppliedAmount)} />
         <SummaryMetric
-          label="Unallocated"
+          label="Advance"
           value={money(remainingAmount)}
           danger={remainingAmount > 0}
         />
-        <div>
-          <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
-            Status
-          </p>
-          <Badge
-            variant={payment.status === "reversed" ? "destructive" : "outline"}
-            className="mt-2 capitalize shadow-none"
-          >
-            {payment.status}
-          </Badge>
-        </div>
       </section>
 
       <section className="grid gap-6 sm:grid-cols-2">
@@ -175,6 +165,7 @@ export function PaymentDetailClient({
           title="Payment details"
           rows={[
             ["Direction", payment.direction === "in" ? "Received" : "Paid"],
+            ["Status", payment.status],
             ["Reference", payment.reference_number ?? "-"],
             ["Notes", payment.notes ?? "-"],
           ]}
@@ -207,7 +198,8 @@ export function PaymentDetailClient({
             Allocations
           </h2>
           <p className="text-xs text-muted-foreground">
-            Documents this payment has been applied to.
+            Documents this payment has been applied to. Opening balance is applied
+            in the summary because it is account-level.
           </p>
         </div>
 

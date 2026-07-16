@@ -40,6 +40,9 @@ export type PurchaseData = {
     payment_number: string
     payment_date: string
     payment_method: string
+    direction: "in" | "out"
+    status: string
+    allocated_amount: number
     amount: number
   }[]
 }
@@ -85,15 +88,17 @@ export async function getPurchaseData(id: string): Promise<PurchaseData> {
 
   if (supplierError) throw new Error(supplierError.message)
 
-  const paymentIds = (allocations ?? []).map(
+  const allocationRows = allocations ?? []
+  const paymentIds = allocationRows.map(
     (allocation) => allocation.payment_id
   )
   const { data: payments } = paymentIds.length
     ? await supabase
         .from("payments")
-        .select("id,payment_number,payment_date,payment_method,amount")
+        .select("id,payment_number,created_at,payment_method,direction,status,reversed_payment_id")
         .in("id", paymentIds)
     : { data: [] }
+  const paymentMap = new Map((payments ?? []).map((payment) => [payment.id, payment]))
 
   return {
     purchase: {
@@ -114,11 +119,23 @@ export async function getPurchaseData(id: string): Promise<PurchaseData> {
       due_amount: Number(balance.due_amount),
       payment_status: balance.payment_status,
     },
-    payments: (payments ?? []).map((payment) => ({
-      payment_number: payment.payment_number,
-      payment_date: payment.payment_date,
-      payment_method: payment.payment_method,
-      amount: Number(payment.amount),
-    })),
+    payments: allocationRows
+      .map((allocation) => {
+        const payment = paymentMap.get(allocation.payment_id)
+        if (!payment) return null
+        const allocatedAmount = Number(allocation.allocated_amount)
+        return {
+          payment_number: payment.payment_number,
+          payment_date: payment.created_at,
+          payment_method: payment.payment_method,
+          direction: payment.direction as "in" | "out",
+          status: payment.status,
+          allocated_amount: allocatedAmount,
+          amount: payment.direction === "out" ? allocatedAmount : -allocatedAmount,
+        }
+      })
+      .filter((payment): payment is PurchaseData["payments"][number] =>
+        Boolean(payment)
+      ),
   }
 }

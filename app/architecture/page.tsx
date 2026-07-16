@@ -3,6 +3,8 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 
+import { PublicSiteHeader } from "@/components/public-site/public-site-header"
+
 export const metadata: Metadata = {
   title: "Architecture Studio | JR Suthar & Designs",
   description:
@@ -15,8 +17,8 @@ const architectDetails = [
   ["Role", "Architect"],
   ["Experience", "8+ years in residential and commercial design"],
   ["Speciality", "Architecture, interiors, renovation, and 3D visualization"],
-  ["Studio Office", "Ward No. 20, Aadhar Super Market, PWD Road, Dariba, Bidasar"],
-  ["Email", "narayanitraders011@gmail.com"],
+  ["Studio Office", "Ward No. 20, Near Aadhar Super Market, PWD Road, Dariba, Bidasar"],
+  ["Email", "jrsutharanddesigns@gmail.com"],
   ["Phone", "+91 97823 53866"],
 ]
 
@@ -46,15 +48,9 @@ const services = [
 export default function ArchitecturePage() {
   return (
     <main className="public-light-theme min-h-screen bg-background text-foreground">
+      <PublicSiteHeader />
       <section className="grid min-h-svh w-full lg:grid-cols-[0.9fr_1.1fr]">
         <div className="flex min-h-[72svh] flex-col px-5 py-8 sm:px-8 lg:min-h-svh lg:px-12">
-          <Link
-            href="/"
-            className="inline-flex h-9 w-fit items-center rounded-md bg-secondary px-3 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
-          >
-            Home
-          </Link>
-
           <div className="mt-auto max-w-4xl pb-10 pt-20">
             <h1 className="text-5xl font-semibold leading-none tracking-tight sm:text-7xl lg:text-8xl">
               <span className="block">Architecture</span>

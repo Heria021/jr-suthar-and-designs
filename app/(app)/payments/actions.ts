@@ -15,7 +15,6 @@ export type RecordPaymentInput = {
   direction: "in" | "out"
   amount: number
   payment_method: PaymentMethod
-  payment_date: string
   reference_number: string | null
   notes: string | null
   auto_allocate: boolean

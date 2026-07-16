@@ -19,7 +19,6 @@ import {
 } from "@/app/(app)/payments/actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -29,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -49,10 +47,11 @@ export type PaymentRow = {
   contact_phone: string | null
   direction: "in" | "out"
   amount: number
+  document_allocated_amount: number
+  opening_applied_amount: number
   allocated_amount: number
   remaining_amount: number
   payment_method: string
-  payment_date: string
   reference_number: string | null
   notes: string | null
   status: string
@@ -118,10 +117,6 @@ function money(value: number) {
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" })
 
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 function methodLabel(method: string) {
   return methods.find((entry) => entry.value === method)?.label ?? method
 }
@@ -160,10 +155,8 @@ export function PaymentsWorkspace({
   const [recordContactId, setRecordContactId] = useState("")
   const [recordAmount, setRecordAmount] = useState("")
   const [recordMethod, setRecordMethod] = useState<PaymentMethod>("cash")
-  const [recordPaymentDate, setRecordPaymentDate] = useState(today())
   const [recordReference, setRecordReference] = useState("")
   const [recordNotes, setRecordNotes] = useState("")
-  const [recordAutoAllocate, setRecordAutoAllocate] = useState(true)
 
   // Manual Allocation States
   const [allocatePaymentId, setAllocatePaymentId] = useState("")
@@ -173,6 +166,7 @@ export function PaymentsWorkspace({
   const totals = useMemo(() => {
     return payments.reduce(
       (acc, payment) => {
+        if (payment.status !== "completed") return acc
         if (payment.direction === "in") acc.received += payment.amount
         else acc.paid += payment.amount
         acc.unallocated += payment.remaining_amount
@@ -196,6 +190,7 @@ export function PaymentsWorkspace({
         filter === "all" ||
         payment.direction === filter ||
         (filter === "advance" &&
+          payment.status === "completed" &&
           payment.remaining_amount > 0 &&
           !payment.reversed_payment_id) ||
         (filter === "reversed" &&
@@ -265,10 +260,9 @@ export function PaymentsWorkspace({
         direction: recordDirection,
         amount: recordAmountNum,
         payment_method: recordMethod,
-        payment_date: recordPaymentDate,
         reference_number: recordReference.trim() || null,
         notes: recordNotes.trim() || null,
-        auto_allocate: recordAutoAllocate,
+        auto_allocate: true,
       })
 
       if (!result.ok) {
@@ -333,8 +327,8 @@ export function PaymentsWorkspace({
             Payments
           </h1>
           <p className="max-w-xl text-sm text-muted-foreground">
-            Record customer receipts, supplier payments, advances, allocations,
-            reversals, and daily cash flow.
+            Payments apply to opening balance first, then pending bills or purchases.
+            Any leftover stays as advance.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -364,7 +358,7 @@ export function PaymentsWorkspace({
         <SummaryMetric label="Paid" value={money(totals.paid)} />
         <SummaryMetric label="Net" value={money(totals.received - totals.paid)} />
         <SummaryMetric
-          label="Unallocated"
+          label="Advance"
           value={money(totals.unallocated)}
           danger={totals.unallocated > 0}
         />
@@ -378,7 +372,7 @@ export function PaymentsWorkspace({
           <div className="space-y-1">
             <h2 className="text-sm font-semibold text-foreground">Record payment</h2>
             <p className="text-xs text-muted-foreground">
-              Turn auto allocation off to keep it as an advance payment.
+              The system applies this payment automatically. Extra amount remains as advance.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -463,11 +457,6 @@ export function PaymentsWorkspace({
             </div>
 
             <div className="space-y-2">
-              <Label>Date</Label>
-              <DatePicker value={recordPaymentDate} onChange={setRecordPaymentDate} />
-            </div>
-
-            <div className="space-y-2">
               <Label>Reference</Label>
               <Input
                 value={recordReference}
@@ -484,19 +473,6 @@ export function PaymentsWorkspace({
                 onChange={(e) => setRecordNotes(e.target.value)}
                 placeholder="Optional"
                 className="min-h-20 shadow-none"
-              />
-            </div>
-
-            <div className="sm:col-span-2 flex items-center justify-between gap-4 rounded-md border bg-secondary/40 px-3 py-2 text-sm">
-              <span>
-                <span className="font-medium">Auto allocate</span>
-                <span className="block text-xs text-muted-foreground">
-                  Apply to oldest pending documents
-                </span>
-              </span>
-              <Switch
-                checked={recordAutoAllocate}
-                onCheckedChange={setRecordAutoAllocate}
               />
             </div>
           </div>
@@ -531,7 +507,7 @@ export function PaymentsWorkspace({
           <div className="space-y-1">
             <h2 className="text-sm font-semibold text-foreground">Manual allocation</h2>
             <p className="text-xs text-muted-foreground">
-              Allocate an advance payment to a specific bill or purchase.
+              Use this only when you need to move remaining advance to a specific document.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -706,7 +682,7 @@ function PaymentsList({
                 Amount
               </TableHead>
               <TableHead className="h-10 text-xs font-medium text-muted-foreground">
-                Unallocated
+                Advance
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -727,7 +703,7 @@ function PaymentsList({
                       <span className="font-medium">{payment.payment_number}</span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {dateFormatter.format(new Date(payment.payment_date))}
+                      {dateFormatter.format(new Date(payment.created_at))}
                     </div>
                   </Link>
                 </TableCell>
@@ -756,13 +732,20 @@ function PaymentsList({
                   {money(payment.amount)}
                 </TableCell>
                 <TableCell className="text-sm">
-                  {payment.remaining_amount > 0 ? (
-                    <span className="font-medium text-destructive">
-                      {money(payment.remaining_amount)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+                  <div>
+                    {payment.remaining_amount > 0 ? (
+                      <span className="font-medium text-destructive">
+                        {money(payment.remaining_amount)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                    {payment.opening_applied_amount > 0 ? (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Opening {money(payment.opening_applied_amount)}
+                      </div>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

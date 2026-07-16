@@ -141,7 +141,7 @@ export function ProductsWorkspace({
                       Reorder
                     </TableHead>
                     <TableHead className="h-10 text-xs font-medium text-muted-foreground">
-                      Loose sale
+                      Unit sale
                     </TableHead>
                     <TableHead className="h-10 text-xs font-medium text-muted-foreground">
                       Box info

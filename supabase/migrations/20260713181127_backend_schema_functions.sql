@@ -127,7 +127,6 @@ create table public.payments (
   direction text not null check (direction in ('in', 'out')),
   amount numeric(14,2) not null check (amount > 0),
   payment_method text not null check (payment_method in ('cash', 'upi', 'bank', 'card', 'other')),
-  payment_date date not null default current_date,
   reference_number text,
   notes text,
   status text not null default 'completed' check (status in ('completed', 'reversed')),
@@ -207,8 +206,8 @@ create index sale_items_sale_idx on public.sale_items(sale_id);
 create index purchases_supplier_date_idx on public.purchases(supplier_id, purchase_date desc);
 create index purchases_status_date_idx on public.purchases(status, purchase_date desc);
 create index purchase_items_purchase_idx on public.purchase_items(purchase_id);
-create index payments_contact_date_idx on public.payments(contact_id, payment_date desc);
-create index payments_method_date_idx on public.payments(payment_method, payment_date desc);
+create index payments_contact_created_idx on public.payments(contact_id, created_at desc);
+create index payments_method_created_idx on public.payments(payment_method, created_at desc);
 create index payment_allocations_sale_idx on public.payment_allocations(sale_id);
 create index payment_allocations_purchase_idx on public.payment_allocations(purchase_id);
 create index stock_movements_product_idx on public.stock_movements(product_id, occurred_at desc);
@@ -425,38 +424,47 @@ with (security_invoker = true) as
 select
   c.id as contact_id,
   c.opening_balance,
-  (c.opening_balance
-    + coalesce((select sum(total_amount) from public.sales s where s.customer_id = c.id and s.status = 'finalized'), 0)
-    - coalesce((
-      select sum(case when p.direction = 'in' then p.amount else -p.amount end)
-      from public.payments p
-      left join public.payments original on original.id = p.reversed_payment_id
-      where p.contact_id = c.id
-        and (p.direction = 'in' or original.direction = 'in')
-    ), 0)
-  )::numeric(14,2) as customer_balance,
-  (c.opening_balance
-    + coalesce((select sum(total_amount) from public.purchases pu where pu.supplier_id = c.id and pu.status = 'finalized'), 0)
-    - coalesce((
-      select sum(case when p.direction = 'out' then p.amount else -p.amount end)
-      from public.payments p
-      left join public.payments original on original.id = p.reversed_payment_id
-      where p.contact_id = c.id
-        and (p.direction = 'out' or original.direction = 'out')
-    ), 0)
-  )::numeric(14,2) as supplier_balance
+  case
+    when c.contact_type in ('customer', 'walk_in', 'both') then
+      (c.opening_balance
+        + coalesce((select sum(total_amount) from public.sales s where s.customer_id = c.id and s.status = 'finalized'), 0)
+        - coalesce((
+          select sum(case when p.direction = 'in' then p.amount else -p.amount end)
+          from public.payments p
+          left join public.payments original on original.id = p.reversed_payment_id
+          where p.contact_id = c.id
+            and (p.direction = 'in' or original.direction = 'in')
+        ), 0)
+      )::numeric(14,2)
+    else 0::numeric(14,2)
+  end as customer_balance,
+  case
+    when c.contact_type in ('supplier', 'both') then
+      (c.opening_balance
+        + coalesce((select sum(total_amount) from public.purchases pu where pu.supplier_id = c.id and pu.status = 'finalized'), 0)
+        - coalesce((
+          select sum(case when p.direction = 'out' then p.amount else -p.amount end)
+          from public.payments p
+          left join public.payments original on original.id = p.reversed_payment_id
+          where p.contact_id = c.id
+            and (p.direction = 'out' or original.direction = 'out')
+        ), 0)
+      )::numeric(14,2)
+    else 0::numeric(14,2)
+  end as supplier_balance
 from public.contacts c;
 
 create view public.daily_payment_totals
 with (security_invoker = true) as
 select
-  payment_date,
+  created_at::date as payment_date,
   payment_method,
   sum(case when direction = 'in' then amount else 0 end)::numeric(14,2) as received_amount,
   sum(case when direction = 'out' then amount else 0 end)::numeric(14,2) as paid_amount,
   sum(case when direction = 'in' then amount else -amount end)::numeric(14,2) as net_amount
 from public.payments
-group by payment_date, payment_method;
+where status = 'completed'
+group by created_at::date, payment_method;
 
 create view public.stock_reconciliation
 with (security_invoker = true) as
@@ -489,29 +497,48 @@ stable
 security definer
 set search_path = public
 as $$
-  with entries as (
+  with target_contact as (
+    select c.*
+    from public.contacts c
+    where app.owner_guard_passes()
+      and c.id = p_contact_id
+  ),
+  entries as (
     select c.opening_balance_date as entry_date, 'opening' as entry_type, c.id as reference_id, 'Opening balance' as description,
-      greatest(c.opening_balance, 0)::numeric as debit,
-      greatest(-c.opening_balance, 0)::numeric as credit,
-      c.opening_balance::numeric as delta
-    from public.contacts c where app.owner_guard_passes() and c.id = p_contact_id
+      case
+        when c.contact_type = 'supplier' then greatest(-c.opening_balance, 0)::numeric
+        else greatest(c.opening_balance, 0)::numeric
+      end as debit,
+      case
+        when c.contact_type = 'supplier' then greatest(c.opening_balance, 0)::numeric
+        else greatest(-c.opening_balance, 0)::numeric
+      end as credit,
+      case
+        when c.contact_type = 'supplier' then -c.opening_balance::numeric
+        else c.opening_balance::numeric
+      end as delta,
+      coalesce(c.opening_balance_date::timestamp + c.created_at::time, c.created_at::timestamp) as entry_at
+    from target_contact c
     union all
-    select s.sale_date, 'sale', s.id, s.sale_number, s.total_amount, 0::numeric, s.total_amount
+    select s.sale_date, 'sale', s.id, s.sale_number, s.total_amount, 0::numeric, s.total_amount,
+      s.sale_date::timestamp + s.created_at::time
     from public.sales s where s.customer_id = p_contact_id and s.status = 'finalized'
     union all
-    select pu.purchase_date, 'purchase', pu.id, pu.purchase_number, pu.total_amount, 0::numeric, pu.total_amount
+    select pu.purchase_date, 'purchase', pu.id, pu.purchase_number, 0::numeric, pu.total_amount, -pu.total_amount,
+      pu.purchase_date::timestamp + pu.created_at::time
     from public.purchases pu where pu.supplier_id = p_contact_id and pu.status = 'finalized'
     union all
-    select p.payment_date, 'payment', p.id, p.payment_number,
+    select p.created_at::date, 'payment', p.id, p.payment_number,
       case when p.direction = 'out' then p.amount else 0 end,
       case when p.direction = 'in' then p.amount else 0 end,
-      case when p.direction = 'out' then p.amount else -p.amount end
+      case when p.direction = 'out' then p.amount else -p.amount end,
+      p.created_at::timestamp
     from public.payments p where p.contact_id = p_contact_id
   )
   select entry_date, entry_type, reference_id, description, debit, credit,
-    sum(delta) over (order by entry_date nulls first, entry_type, reference_id)::numeric(14,2) as running_balance
+    sum(delta) over (order by entry_at nulls first)::numeric(14,2) as running_balance
   from entries
-  order by entry_date nulls first, entry_type, reference_id;
+  order by entry_at nulls first;
 $$;
 
 create or replace function public.create_contact(p_idempotency_key text, p_payload jsonb)
@@ -959,7 +986,6 @@ begin
         'direction', 'in',
         'amount', (p_initial_payment ->> 'amount')::numeric,
         'payment_method', coalesce(p_initial_payment ->> 'payment_method', 'cash'),
-        'payment_date', coalesce(p_initial_payment ->> 'payment_date', v_sale.sale_date::text),
         'reference_number', p_initial_payment ->> 'reference_number',
         'notes', p_initial_payment ->> 'notes'
       )
@@ -1173,7 +1199,6 @@ begin
         'direction', 'out',
         'amount', (p_initial_payment ->> 'amount')::numeric,
         'payment_method', coalesce(p_initial_payment ->> 'payment_method', 'cash'),
-        'payment_date', coalesce(p_initial_payment ->> 'payment_date', v_purchase.purchase_date::text),
         'reference_number', p_initial_payment ->> 'reference_number',
         'notes', p_initial_payment ->> 'notes'
       )
@@ -1311,14 +1336,13 @@ begin
     raise exception 'invalid payment direction';
   end if;
 
-  insert into public.payments (payment_number, contact_id, direction, amount, payment_method, payment_date, reference_number, notes)
+  insert into public.payments (payment_number, contact_id, direction, amount, payment_method, reference_number, notes)
   values (
     'PAY-' || lpad(nextval('public.payment_number_seq')::text, 6, '0'),
     v_contact_id,
     v_direction,
     v_amount,
     coalesce(p_payload ->> 'payment_method', 'cash'),
-    coalesce((p_payload ->> 'payment_date')::date, current_date),
     p_payload ->> 'reference_number',
     p_payload ->> 'notes'
   ) returning id into v_id;
@@ -1351,6 +1375,106 @@ begin
 end;
 $$;
 
+create or replace function public.record_sale_payment(p_idempotency_key text, p_sale_id uuid, p_payload jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_replay jsonb; v_sale public.sales%rowtype; v_amount numeric(14,2);
+  v_due numeric(14,2); v_payment jsonb; v_allocation jsonb; v_payment_id uuid; v_result jsonb;
+begin
+  perform app.assert_owner();
+  v_replay := app.idempotency_get_result(p_idempotency_key, 'record_sale_payment', jsonb_build_object('sale_id', p_sale_id, 'payload', p_payload));
+  if v_replay is not null then return v_replay; end if;
+
+  v_amount := (p_payload ->> 'amount')::numeric;
+  if v_amount <= 0 then raise exception 'payment amount must be positive'; end if;
+
+  select * into v_sale from public.sales where id = p_sale_id and status = 'finalized' for update;
+  if not found then raise exception 'finalized sale not found'; end if;
+
+  v_due := app.sale_due_for_update(p_sale_id);
+  if v_amount > v_due then raise exception 'payment cannot exceed bill due'; end if;
+
+  v_payment := public.record_payment(
+    p_idempotency_key || ':payment',
+    jsonb_build_object(
+      'contact_id', v_sale.customer_id,
+      'direction', 'in',
+      'amount', v_amount,
+      'payment_method', coalesce(nullif(p_payload ->> 'payment_method', ''), 'cash'),
+      'reference_number', nullif(trim(coalesce(p_payload ->> 'reference_number', '')), ''),
+      'notes', nullif(trim(coalesce(p_payload ->> 'notes', '')), ''),
+      'auto_allocate', false
+    )
+  );
+
+  v_payment_id := (v_payment ->> 'id')::uuid;
+  v_allocation := public.allocate_payment(
+    p_idempotency_key || ':allocation',
+    v_payment_id,
+    p_sale_id,
+    null,
+    v_amount
+  );
+
+  v_result := jsonb_build_object('id', v_payment_id, 'allocation_id', (v_allocation ->> 'id')::uuid);
+  return app.idempotency_finish(p_idempotency_key, v_payment_id, v_result);
+end;
+$$;
+
+create or replace function public.record_purchase_payment(p_idempotency_key text, p_purchase_id uuid, p_payload jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_replay jsonb; v_purchase public.purchases%rowtype; v_amount numeric(14,2);
+  v_due numeric(14,2); v_payment jsonb; v_allocation jsonb; v_payment_id uuid; v_result jsonb;
+begin
+  perform app.assert_owner();
+  v_replay := app.idempotency_get_result(p_idempotency_key, 'record_purchase_payment', jsonb_build_object('purchase_id', p_purchase_id, 'payload', p_payload));
+  if v_replay is not null then return v_replay; end if;
+
+  v_amount := (p_payload ->> 'amount')::numeric;
+  if v_amount <= 0 then raise exception 'payment amount must be positive'; end if;
+
+  select * into v_purchase from public.purchases where id = p_purchase_id and status = 'finalized' for update;
+  if not found then raise exception 'finalized purchase not found'; end if;
+
+  v_due := app.purchase_due_for_update(p_purchase_id);
+  if v_amount > v_due then raise exception 'payment cannot exceed purchase due'; end if;
+
+  v_payment := public.record_payment(
+    p_idempotency_key || ':payment',
+    jsonb_build_object(
+      'contact_id', v_purchase.supplier_id,
+      'direction', 'out',
+      'amount', v_amount,
+      'payment_method', coalesce(nullif(p_payload ->> 'payment_method', ''), 'cash'),
+      'reference_number', nullif(trim(coalesce(p_payload ->> 'reference_number', '')), ''),
+      'notes', nullif(trim(coalesce(p_payload ->> 'notes', '')), ''),
+      'auto_allocate', false
+    )
+  );
+
+  v_payment_id := (v_payment ->> 'id')::uuid;
+  v_allocation := public.allocate_payment(
+    p_idempotency_key || ':allocation',
+    v_payment_id,
+    null,
+    p_purchase_id,
+    v_amount
+  );
+
+  v_result := jsonb_build_object('id', v_payment_id, 'allocation_id', (v_allocation ->> 'id')::uuid);
+  return app.idempotency_finish(p_idempotency_key, v_payment_id, v_result);
+end;
+$$;
+
 create or replace function public.reverse_payment(p_idempotency_key text, p_payment_id uuid, p_reason text)
 returns jsonb
 language plpgsql
@@ -1367,10 +1491,11 @@ begin
   select * into v_payment from public.payments where id = p_payment_id for update;
   if not found then raise exception 'payment not found'; end if;
   if v_payment.reversed_payment_id is not null then raise exception 'cannot reverse a reversal payment'; end if;
+  if v_payment.status = 'reversed' then raise exception 'payment already reversed'; end if;
   if exists(select 1 from public.payments where reversed_payment_id = p_payment_id) then raise exception 'payment already reversed'; end if;
 
   insert into public.payments (
-    payment_number, contact_id, direction, amount, payment_method, payment_date,
+    payment_number, contact_id, direction, amount, payment_method,
     reference_number, notes, status, reversed_payment_id, reversal_reason
   ) values (
     'PAY-' || lpad(nextval('public.payment_number_seq')::text, 6, '0'),
@@ -1378,7 +1503,6 @@ begin
     case when v_payment.direction = 'in' then 'out' else 'in' end,
     v_payment.amount,
     v_payment.payment_method,
-    current_date,
     v_payment.reference_number,
     'Reversal of ' || v_payment.payment_number,
     'reversed',
@@ -1393,6 +1517,11 @@ begin
       perform public.allocate_payment(p_idempotency_key || ':reverse-purchase:' || v_alloc.id::text, v_reverse_id, null, v_alloc.purchase_id, v_alloc.allocated_amount);
     end if;
   end loop;
+
+  update public.payments
+  set status = 'reversed',
+      reversal_reason = p_reason
+  where id = p_payment_id;
 
   v_result := jsonb_build_object('id', v_reverse_id, 'reversed_payment_id', p_payment_id);
   return app.idempotency_finish(p_idempotency_key, v_reverse_id, v_result);

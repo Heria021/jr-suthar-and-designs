@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { MailIcon, MapPinIcon, PhoneIcon } from "lucide-react"
 
 import { ContactInquiryForm } from "@/components/public-site/contact-inquiry-form"
+import { PublicSiteHeader } from "@/components/public-site/public-site-header"
 
 export const metadata: Metadata = {
   title: "Contact | JR Suthar & Designs",
@@ -13,16 +13,8 @@ export const metadata: Metadata = {
 export default function ArchitectureContactPage() {
   return (
     <main className="public-light-theme min-h-screen bg-background text-foreground">
-      <section className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 lg:px-12 lg:py-16">
-        <div className="mb-10 lg:mb-16">
-          <Link
-            href="/"
-            className="inline-flex h-9 items-center rounded-md bg-secondary px-3 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
-          >
-            Home
-          </Link>
-        </div>
-
+      <PublicSiteHeader />
+      <section className="mx-auto w-full max-w-7xl px-5 pb-8 pt-28 sm:px-8 lg:px-12 lg:pb-16 lg:pt-32">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-x-16 lg:items-start">
           <div className="space-y-6 lg:max-w-lg">
             <h1 className="text-5xl font-semibold leading-none tracking-tight sm:text-7xl lg:text-8xl">
@@ -64,7 +56,7 @@ export default function ArchitectureContactPage() {
                 </p>
               </div>
               <p className="text-sm leading-6 text-foreground pl-12">
-                Ward No. 20, Aadhar Super Market, PWD Road, Dariba, Bidasar
+                Ward No. 20, Near Aadhar Super Market, PWD Road, Dariba, Bidasar
               </p>
             </div>
 
@@ -79,10 +71,10 @@ export default function ArchitectureContactPage() {
               </div>
               <p className="text-sm leading-6 text-foreground pl-12">
                 <a
-                  href="mailto:narayanitraders011@gmail.com"
+                  href="mailto:jrsutharanddesigns@gmail.com"
                   className="text-foreground transition-colors hover:text-muted-foreground underline underline-offset-4 decoration-border hover:decoration-foreground"
                 >
-                  narayanitraders011@gmail.com
+                  jrsutharanddesigns@gmail.com
                 </a>
               </p>
             </div>

@@ -12,7 +12,7 @@ export default async function PaymentsPage() {
   const [
     { data: payments, error: paymentsError },
     { data: contacts, error: contactsError },
-    { data: allocations, error: allocationsError },
+    { data: paymentStatuses, error: paymentStatusesError },
     { data: saleBalances, error: saleBalancesError },
     { data: purchaseBalances, error: purchaseBalancesError },
     { data: sales, error: salesError },
@@ -22,9 +22,8 @@ export default async function PaymentsPage() {
     supabase
       .from("payments")
       .select(
-        "id,payment_number,contact_id,direction,amount,payment_method,payment_date,reference_number,notes,status,reversed_payment_id,reversal_reason,created_at"
+        "id,payment_number,contact_id,direction,amount,payment_method,reference_number,notes,status,reversed_payment_id,reversal_reason,created_at"
       )
-      .order("payment_date", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(150),
     supabase
@@ -32,7 +31,11 @@ export default async function PaymentsPage() {
       .select("id,name,phone,contact_type,is_active")
       .eq("is_active", true)
       .order("name"),
-    supabase.from("payment_allocations").select("payment_id,allocated_amount"),
+    supabase
+      .from("payment_allocation_status")
+      .select(
+        "payment_id,document_allocated_amount,opening_applied_amount,effective_allocated_amount,effective_remaining_amount"
+      ),
     supabase
       .from("sale_balances")
       .select("sale_id,paid_amount,due_amount,payment_status"),
@@ -60,7 +63,7 @@ export default async function PaymentsPage() {
 
   if (paymentsError) throw new Error(paymentsError.message)
   if (contactsError) throw new Error(contactsError.message)
-  if (allocationsError) throw new Error(allocationsError.message)
+  if (paymentStatusesError) throw new Error(paymentStatusesError.message)
   if (saleBalancesError) throw new Error(saleBalancesError.message)
   if (purchaseBalancesError) throw new Error(purchaseBalancesError.message)
   if (salesError) throw new Error(salesError.message)
@@ -68,18 +71,25 @@ export default async function PaymentsPage() {
   if (totalsError) throw new Error(totalsError.message)
 
   const contactMap = new Map((contacts ?? []).map((contact) => [contact.id, contact]))
-  const allocationTotals = new Map<string, number>()
-  for (const allocation of allocations ?? []) {
-    allocationTotals.set(
-      allocation.payment_id,
-      (allocationTotals.get(allocation.payment_id) ?? 0) +
-        Number(allocation.allocated_amount)
-    )
-  }
+  const paymentStatusMap = new Map(
+    (paymentStatuses ?? []).map((status) => [status.payment_id, status])
+  )
 
   const paymentRows: PaymentRow[] = (payments ?? []).map((payment) => {
     const contact = contactMap.get(payment.contact_id)
-    const allocatedAmount = allocationTotals.get(payment.id) ?? 0
+    const status = paymentStatusMap.get(payment.id)
+    const documentAllocatedAmount = Number(status?.document_allocated_amount ?? 0)
+    const openingAppliedAmount = Number(status?.opening_applied_amount ?? 0)
+    const allocatedAmount = Number(
+      status?.effective_allocated_amount ?? documentAllocatedAmount
+    )
+    const remainingAmount =
+      payment.status === "completed"
+        ? Number(
+            status?.effective_remaining_amount ??
+              Math.max(Number(payment.amount) - allocatedAmount, 0)
+          )
+        : 0
 
     return {
       id: payment.id,
@@ -89,10 +99,11 @@ export default async function PaymentsPage() {
       contact_phone: contact?.phone ?? null,
       direction: payment.direction as "in" | "out",
       amount: Number(payment.amount),
+      document_allocated_amount: documentAllocatedAmount,
+      opening_applied_amount: openingAppliedAmount,
       allocated_amount: allocatedAmount,
-      remaining_amount: Math.max(Number(payment.amount) - allocatedAmount, 0),
+      remaining_amount: remainingAmount,
       payment_method: payment.payment_method,
-      payment_date: payment.payment_date,
       reference_number: payment.reference_number,
       notes: payment.notes,
       status: payment.status,

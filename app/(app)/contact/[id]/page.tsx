@@ -22,6 +22,7 @@ export type ContactDetail = {
 
 export type ContactStatementRow = {
   entry_date: string | null
+  entry_at: string | null
   entry_type: string
   reference_id: string
   description: string
@@ -36,7 +37,6 @@ export type ContactPaymentRow = {
   direction: "in" | "out"
   amount: number
   payment_method: string
-  payment_date: string
   reference_number: string | null
   notes: string | null
   status: string
@@ -72,10 +72,9 @@ export default async function ContactDetailPage({
     supabase
       .from("payments")
       .select(
-        "id,payment_number,direction,amount,payment_method,payment_date,reference_number,notes,status,created_at"
+        "id,payment_number,direction,amount,payment_method,reference_number,notes,status,created_at"
       )
       .eq("contact_id", id)
-      .order("payment_date", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(50),
   ])

@@ -8,6 +8,37 @@ type ActionResult<T = unknown> =
   | { ok: true; data: T }
   | { ok: false; error: string }
 
+export type PurchasePaymentMethod = "cash" | "upi" | "bank" | "card" | "other"
+
+export type CompletePurchaseItemInput = {
+  product_id: string
+  entry_mode: "loose" | "box"
+  quantity: number
+  cost_per_entry: number | null
+}
+
+export type CompletePurchaseInput = {
+  supplier_id: string | null
+  supplier: {
+    name: string
+    phone: string | null
+    address: string | null
+  }
+  purchase_date: string
+  supplier_invoice_number: string | null
+  discount_amount: number
+  additional_cost: number
+  update_product_cost: boolean
+  notes: string | null
+  items: CompletePurchaseItemInput[]
+  initial_payment: {
+    amount: number
+    payment_method: PurchasePaymentMethod
+    reference_number: string | null
+    notes: string | null
+  } | null
+}
+
 function key(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
@@ -47,6 +78,52 @@ export async function createDraftPurchaseFromPayloadAction(payload: {
   }
 
   return result
+}
+
+export async function createCompletePurchaseAction(
+  payload: CompletePurchaseInput
+): Promise<ActionResult<{ id: string; total_amount: number }>> {
+  try {
+    if (!payload.supplier_id && !payload.supplier.name.trim()) {
+      throw new Error("Supplier name is required")
+    }
+    if (!payload.items.length) {
+      throw new Error("Add at least one item")
+    }
+    if (payload.discount_amount < 0) {
+      throw new Error("Discount cannot be negative")
+    }
+    if (payload.additional_cost < 0) {
+      throw new Error("Additional cost cannot be negative")
+    }
+
+    for (const item of payload.items) {
+      if (!item.product_id) throw new Error("Every item must have a product")
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw new Error("Item quantity must be a positive whole number")
+      }
+      if (item.cost_per_entry != null && item.cost_per_entry < 0) {
+        throw new Error("Item cost cannot be negative")
+      }
+    }
+
+    if (payload.initial_payment && payload.initial_payment.amount < 0) {
+      throw new Error("Payment cannot be negative")
+    }
+
+    const result = await rpc<{ id: string; total_amount: number }>(
+      "complete_purchase",
+      {
+        p_idempotency_key: key("purchase-complete"),
+        p_payload: payload,
+      }
+    )
+
+    if (result.ok) revalidatePath(`/purchases/${result.data.id}`)
+    return result
+  } catch (error) {
+    return fail(error)
+  }
 }
 
 export async function addPurchaseItemAction(formData: FormData) {
@@ -107,7 +184,6 @@ export async function finalizePurchaseAction(formData: FormData) {
         ? {
             amount: paymentAmount,
             payment_method: String(formData.get("payment_method") ?? "cash"),
-            payment_date: String(formData.get("payment_date") ?? ""),
             reference_number:
               String(formData.get("reference_number") ?? "").trim() || null,
             notes: "Initial purchase payment",
@@ -126,44 +202,19 @@ export async function recordPurchasePaymentAction(formData: FormData) {
       throw new Error("Payment amount must be positive")
     }
 
-    const supabase = await createClient()
-    const { data: balance, error: balanceError } = await supabase
-      .from("purchase_balances")
-      .select("due_amount")
-      .eq("purchase_id", purchaseId)
-      .single()
-
-    if (balanceError) throw new Error(balanceError.message)
-    if (amount > Number(balance.due_amount)) {
-      throw new Error("Payment cannot exceed purchase due")
-    }
-
-    const payment = await rpc<{ id: string }>("record_payment", {
+    const payment = await rpc<{ id: string }>("record_purchase_payment", {
       p_idempotency_key: key("purchase-payment"),
+      p_purchase_id: purchaseId,
       p_payload: {
-        contact_id: String(formData.get("supplier_id")),
-        direction: "out",
         amount,
         payment_method: String(formData.get("payment_method") ?? "cash"),
-        payment_date: String(formData.get("payment_date") ?? ""),
         reference_number:
           String(formData.get("reference_number") ?? "").trim() || null,
         notes: String(formData.get("notes") ?? "").trim() || null,
-        auto_allocate: false,
       },
     })
 
     if (!payment.ok) return payment
-
-    const allocation = await rpc<{ id: string }>("allocate_payment", {
-      p_idempotency_key: key("purchase-payment-allocation"),
-      p_payment_id: payment.data.id,
-      p_sale_id: null,
-      p_purchase_id: purchaseId,
-      p_amount: amount,
-    })
-
-    if (!allocation.ok) return allocation
 
     revalidatePath(`/purchases/${purchaseId}`)
     return { ok: true, data: payment.data } satisfies ActionResult<{ id: string }>

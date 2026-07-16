@@ -23,7 +23,6 @@ export type PaymentPayload = {
   direction: "in" | "out"
   amount: number
   payment_method: "cash" | "upi" | "bank" | "card" | "other"
-  payment_date: string
   reference_number: string | null
   notes: string | null
   auto_allocate: boolean

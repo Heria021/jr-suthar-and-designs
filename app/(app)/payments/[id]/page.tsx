@@ -18,7 +18,7 @@ export default async function PaymentDetailPage({
   const { data: payment, error } = await supabase
     .from("payments")
     .select(
-      "id,payment_number,contact_id,direction,amount,payment_method,payment_date,reference_number,notes,status,reversed_payment_id,reversal_reason,created_at"
+      "id,payment_number,contact_id,direction,amount,payment_method,reference_number,notes,status,reversed_payment_id,reversal_reason,created_at"
     )
     .eq("id", id)
     .maybeSingle()
@@ -29,6 +29,7 @@ export default async function PaymentDetailPage({
   const [
     { data: contact, error: contactError },
     { data: allocations, error: allocationsError },
+    { data: paymentStatus, error: paymentStatusError },
     { data: reversal, error: reversalError },
   ] = await Promise.all([
     supabase
@@ -42,6 +43,13 @@ export default async function PaymentDetailPage({
       .eq("payment_id", id)
       .order("created_at"),
     supabase
+      .from("payment_allocation_status")
+      .select(
+        "document_allocated_amount,opening_applied_amount,effective_allocated_amount,effective_remaining_amount"
+      )
+      .eq("payment_id", id)
+      .maybeSingle(),
+    supabase
       .from("payments")
       .select("id,payment_number")
       .eq("reversed_payment_id", id)
@@ -50,6 +58,7 @@ export default async function PaymentDetailPage({
 
   if (contactError) throw new Error(contactError.message)
   if (allocationsError) throw new Error(allocationsError.message)
+  if (paymentStatusError) throw new Error(paymentStatusError.message)
   if (reversalError) throw new Error(reversalError.message)
 
   const saleIds = (allocations ?? [])
@@ -88,8 +97,18 @@ export default async function PaymentDetailPage({
     contact_type: contact.contact_type,
     direction: payment.direction as "in" | "out",
     amount: Number(payment.amount),
+    document_allocated_amount: Number(
+      paymentStatus?.document_allocated_amount ?? 0
+    ),
+    opening_applied_amount: Number(paymentStatus?.opening_applied_amount ?? 0),
+    allocated_amount: Number(paymentStatus?.effective_allocated_amount ?? 0),
+    remaining_amount:
+      payment.status === "completed"
+        ? Number(
+            paymentStatus?.effective_remaining_amount ?? Number(payment.amount)
+          )
+        : 0,
     payment_method: payment.payment_method,
-    payment_date: payment.payment_date,
     reference_number: payment.reference_number,
     notes: payment.notes,
     status: payment.status,

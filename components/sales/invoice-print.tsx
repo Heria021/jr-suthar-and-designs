@@ -13,13 +13,19 @@ function money(value: number) {
   return moneyFormatter.format(Number(value))
 }
 
+function quantityLabel(item: SaleInvoiceData["items"][number]) {
+  return item.entry_mode === "box"
+    ? `${item.entered_quantity} box`
+    : `${item.entered_quantity} /${item.unit_name || "unit"}`
+}
+
 export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
   const invoiceDate = new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",
   }).format(new Date(invoice.sale.sale_date))
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[210mm] flex-col bg-white p-6 text-[13px] leading-relaxed text-black print:min-h-[267mm] print:p-0">
+    <main className="mx-auto flex min-h-screen max-w-[210mm] flex-col bg-white p-5 text-[12px] leading-normal text-black print:min-h-[267mm] print:p-0">
       <style>{`
         @media print {
           body { background: white; }
@@ -27,16 +33,16 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
           @page { size: A4; margin: 16mm; }
         }
       `}</style>
-      <section className="border-b-2 border-black pb-5">
+      <section className="border-b-2 border-black pb-4">
         <div className="flex items-start justify-between gap-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-[28px] font-bold tracking-tight">
               {businessProfile.name}
             </h1>
             <p className="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-zinc-700">
               {businessProfile.tagline}
             </p>
-            <div className="mt-3 space-y-0.5 text-sm text-zinc-700">
+            <div className="mt-2 space-y-0.5 text-[12px] text-zinc-700">
               <p>Phone: {businessProfile.phone}</p>
               <p>Email: {businessProfile.email}</p>
               <p className="font-mono font-semibold text-black">
@@ -48,10 +54,10 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-600">
               Estimate Invoice
             </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            <h2 className="mt-2 text-[22px] font-bold tracking-tight">
               {invoice.sale.sale_number}
             </h2>
-            <div className="mt-4 space-y-1 text-sm">
+            <div className="mt-3 space-y-1 text-[12px]">
               <p>
                 Date: <strong>{invoiceDate}</strong>
               </p>
@@ -66,7 +72,7 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-8 border-b border-black py-5">
+      <section className="grid grid-cols-2 gap-8 py-4">
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-600">
             From
@@ -89,28 +95,26 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
         </div>
       </section>
 
-      <table className="mt-5 w-full border-collapse text-sm">
+      <table className="mt-3 w-full border-collapse text-[12px]">
         <thead>
-          <tr className="border-b-2 border-black text-left text-xs font-bold uppercase tracking-[0.14em]">
-            <th className="w-12 py-3">#</th>
+          <tr className="border-y border-black text-left text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-700">
+            <th className="w-12 py-2">Sr</th>
             <th>Product</th>
-            <th className="text-right">Mode</th>
-            <th className="text-right">Qty</th>
+            <th className="text-center">Qty</th>
             <th className="text-right">RATE</th>
             <th className="text-right">Amount</th>
           </tr>
         </thead>
         <tbody>
           {invoice.items.map((item, index) => (
-            <tr key={item.id} className="border-b border-zinc-200">
-              <td className="py-3">{String(index + 1).padStart(2, "0")}</td>
-              <td className="font-medium">{item.product_name_snapshot}</td>
-              <td className="text-right capitalize">{item.entry_mode}</td>
-              <td className="text-right">{item.entered_quantity}</td>
-              <td className="text-right">
+            <tr key={item.id} className="border-b border-zinc-200 align-middle">
+              <td className="py-2">{String(index + 1).padStart(2, "0")}</td>
+              <td className="py-2 font-medium">{item.product_name_snapshot}</td>
+              <td className="py-2 text-center">{quantityLabel(item)}</td>
+              <td className="py-2 text-right">
                 {money(item.price_per_entry)}
               </td>
-              <td className="text-right font-semibold">
+              <td className="py-2 text-right font-semibold">
                 {money(item.line_total)}
               </td>
             </tr>
@@ -118,7 +122,7 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
         </tbody>
       </table>
 
-      <section className="mt-7 grid grid-cols-[1fr_280px] gap-8">
+      <section className="mt-5 grid grid-cols-[1fr_270px] gap-8">
         <div className="space-y-4">
           {invoice.sale.notes ? (
             <div className="max-w-[360px] text-sm">
@@ -129,7 +133,7 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
             </div>
           ) : null}
         </div>
-        <div className="space-y-3 text-sm">
+        <div className="space-y-2 text-[12px]">
           <SummaryRow label="Subtotal" value={money(invoice.sale.subtotal)} />
           <SummaryRow
             label="Discount"
@@ -156,18 +160,8 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
         </div>
       </section>
 
-      <footer className="mt-auto pt-8">
-        <section className="rounded-md border border-black px-4 py-3 text-sm">
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-zinc-600">
-            TERMS & CONDITIONS
-          </p>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>Goods once sold will not be taken back or exchanged without prior approval.</li>
-            <li>Payment for Udhaar bills is due within 30 days of invoice date.</li>
-          </ul>
-        </section>
-
-        <section className="mt-3 flex items-end justify-between gap-8 border-t border-black pt-4 text-sm">
+      <footer className="mt-auto pt-6">
+        <section className="flex items-end justify-between gap-8 border-t border-black pt-4 text-[12px]">
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-zinc-600">
               BANK DETAILS
@@ -190,10 +184,10 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-600">
                 UPI PAYMENT
               </p>
-              <p className="mt-2 text-lg font-semibold">
+              <p className="mt-2 text-base font-semibold">
                 {money(invoice.balance.due_amount)}
               </p>
-              <p className="mt-2 max-w-44 text-sm text-zinc-600">
+              <p className="mt-2 max-w-44 text-[12px] text-zinc-600">
                 Scan QR to pay Narayani Traders
               </p>
             </div>
@@ -207,7 +201,16 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
             />
           </div>
         </section>
-        <p className="mt-4 border-t border-dashed border-black pt-3 text-center text-sm italic text-zinc-600">
+        <section className="mt-4 border-t border-dashed border-black pt-3 text-[12px]">
+          <p className="mb-1 text-xs font-medium uppercase tracking-[0.16em] text-zinc-600">
+            TERMS & CONDITIONS
+          </p>
+          <ul className="list-disc space-y-0.5 pl-5">
+            <li>Goods once sold will not be taken back or exchanged without prior approval.</li>
+            <li>Payment for Udhaar bills is due within 30 days of invoice date.</li>
+          </ul>
+        </section>
+        <p className="mt-3 text-center text-[12px] italic text-zinc-600">
           Thank you for your business!
         </p>
       </footer>
@@ -225,7 +228,7 @@ function SummaryRow({
   strong?: boolean
 }) {
   return (
-    <div className={strong ? "flex justify-between text-lg font-bold" : "flex justify-between"}>
+    <div className={strong ? "flex justify-between text-base font-bold" : "flex justify-between"}>
       <span>{label}</span>
       <span>{value}</span>
     </div>

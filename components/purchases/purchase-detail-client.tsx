@@ -79,8 +79,8 @@ function money(value: number) {
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" })
 
-function today() {
-  return new Date().toISOString().slice(0, 10)
+function modeLabel(mode: string) {
+  return mode === "loose" ? "Unit" : "Box"
 }
 
 function statusVariant(
@@ -437,24 +437,22 @@ function AddItemPanel({
             showClear
             className="w-full shadow-none"
           />
-          {productName.trim() ? (
-            <ComboboxContent>
-              <ComboboxEmpty>No product found. Keep typing to create new.</ComboboxEmpty>
-              <ComboboxList>
-                {(product: PurchaseProductOption) => (
-                  <ComboboxItem key={product.id} value={product}>
-                    <span className="min-w-0 flex-1 truncate">
-                      {product.name}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {product.sku ? `${product.sku} · ` : ""}
-                      stock {product.stock_on_hand}
-                    </span>
-                  </ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          ) : null}
+          <ComboboxContent>
+            <ComboboxEmpty>No product found. Keep typing to create new.</ComboboxEmpty>
+            <ComboboxList>
+              {(product: PurchaseProductOption) => (
+                <ComboboxItem key={product.id} value={product}>
+                  <span className="min-w-0 flex-1 truncate">
+                    {product.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {product.sku ? `${product.sku} · ` : ""}
+                    stock {product.stock_on_hand}
+                  </span>
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
         </Combobox>
         {selectedProduct ? (
           <div className="flex items-center gap-2 rounded-md border bg-secondary/50 px-3 py-2 text-sm">
@@ -490,7 +488,7 @@ function AddItemPanel({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="loose">Loose</SelectItem>
+              <SelectItem value="loose">Unit</SelectItem>
               <SelectItem value="box" disabled={!selectedProduct?.has_box}>
                 Box
               </SelectItem>
@@ -578,7 +576,7 @@ function ItemsTable({
               ) : (
                 <>
                   <TableCell className="text-sm capitalize text-muted-foreground">
-                    {item.entry_mode}
+                    {modeLabel(item.entry_mode)}
                   </TableCell>
                   <TableCell className="text-sm">
                     {item.entered_quantity} x {item.base_units_per_entry}
@@ -657,7 +655,7 @@ function ItemEditRow({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="loose">Loose</SelectItem>
+          <SelectItem value="loose">Unit</SelectItem>
           <SelectItem value="box">Box</SelectItem>
         </SelectContent>
       </Select>
@@ -736,12 +734,6 @@ function FinalizePanel({
           step="0.01"
           defaultValue="0"
         />
-        <TextInput
-          label="Payment date"
-          name="payment_date"
-          type="date"
-          defaultValue={today()}
-        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -814,7 +806,6 @@ function LaterPaymentPanel({
           step="0.01"
           defaultValue={String(Math.max(due, 0))}
         />
-        <TextInput label="Date" name="payment_date" type="date" defaultValue={today()} />
         <div className="space-y-2">
           <Label>Method</Label>
           <Select
@@ -981,6 +972,8 @@ function TextInput({
   defaultValue?: string | number
   placeholder?: string
 }) {
+  const [value, setValue] = useState(String(defaultValue ?? ""))
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
@@ -988,7 +981,8 @@ function TextInput({
         name={name}
         type={type}
         step={step}
-        defaultValue={defaultValue}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
         min={type === "number" ? "0" : undefined}
         className="shadow-none"

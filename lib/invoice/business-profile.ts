@@ -5,7 +5,7 @@ export const businessProfile = {
   email: "narayanitraders011@gmail.com",
   gstin: "08AAAPL8767A1ZH",
   addressLines: [
-    "Ward No. 20, Aadhar Super Market",
+    "Ward No. 20, Near Aadhar Super Market",
     "PWD Road, Dariba, Bidasar",
   ],
   bank: {

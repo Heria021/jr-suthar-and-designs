@@ -19,7 +19,12 @@ export type CompleteSaleItemInput = {
 export type SalePaymentMethod = "cash" | "upi" | "bank" | "card" | "other"
 
 export type CompleteSaleInput = {
-  customer_id: string
+  customer_id: string | null
+  customer: {
+    name: string
+    phone: string | null
+    address: string | null
+  }
   sale_date: string
   discount_amount: number
   notes: string | null
@@ -27,7 +32,6 @@ export type CompleteSaleInput = {
   initial_payment: {
     amount: number
     payment_method: SalePaymentMethod
-    payment_date: string
     reference_number: string | null
     notes: string | null
   } | null
@@ -60,8 +64,8 @@ export async function createCompleteSaleAction(
   payload: CompleteSaleInput
 ): Promise<ActionResult<{ id: string; total_amount: number }>> {
   try {
-    if (!payload.customer_id) {
-      throw new Error("Customer is required")
+    if (!payload.customer_id && !payload.customer.name.trim()) {
+      throw new Error("Customer name is required")
     }
     if (!payload.items.length) {
       throw new Error("Add at least one item")
@@ -69,18 +73,6 @@ export async function createCompleteSaleAction(
     if (payload.discount_amount < 0) {
       throw new Error("Discount cannot be negative")
     }
-
-    const draft = await rpc<{ id: string }>("create_draft_sale", {
-      p_idempotency_key: key("sale-complete-draft"),
-      p_payload: {
-        customer_id: payload.customer_id,
-        sale_date: payload.sale_date,
-        discount_amount: payload.discount_amount,
-        notes: payload.notes,
-      },
-    })
-
-    if (!draft.ok) return { ok: false, error: draft.error }
 
     for (const item of payload.items) {
       if (!item.product_id) {
@@ -90,35 +82,22 @@ export async function createCompleteSaleAction(
         throw new Error("Item quantity must be a positive whole number")
       }
 
-      const added = await rpc<{ id: string }>("add_sale_item", {
-        p_idempotency_key: key("sale-complete-item"),
-        p_sale_id: draft.data.id,
-        p_product_id: item.product_id,
-        p_entry_mode: item.entry_mode,
-        p_quantity: item.quantity,
-        p_price_per_entry: item.price_per_entry,
-      })
-
-      if (!added.ok) return { ok: false, error: added.error }
+      if (item.price_per_entry != null && item.price_per_entry < 0) {
+        throw new Error("Item rate cannot be negative")
+      }
     }
 
-    const finalized = await rpc<{ id: string; total_amount: number }>(
-      "finalize_sale",
-      {
-        p_idempotency_key: key("sale-complete-finalize"),
-        p_sale_id: draft.data.id,
-        p_discount_amount: payload.discount_amount,
-        p_initial_payment:
-          payload.initial_payment && payload.initial_payment.amount > 0
-            ? payload.initial_payment
-            : null,
-      }
-    )
+    if (payload.initial_payment && payload.initial_payment.amount < 0) {
+      throw new Error("Payment cannot be negative")
+    }
 
-    if (!finalized.ok) return finalized
+    const result = await rpc<{ id: string; total_amount: number }>("complete_sale", {
+      p_idempotency_key: key("sale-complete"),
+      p_payload: payload,
+    })
 
-    revalidatePath(`/sales/${draft.data.id}`)
-    return finalized
+    if (result.ok) revalidatePath(`/sales/${result.data.id}`)
+    return result
   } catch (error) {
     return fail(error)
   }
@@ -193,7 +172,6 @@ export async function finalizeSaleAction(formData: FormData) {
         ? {
             amount: paymentAmount,
             payment_method: String(formData.get("payment_method") ?? "cash"),
-            payment_date: String(formData.get("payment_date") ?? ""),
             notes: "Initial sale payment",
           }
         : null,
@@ -201,19 +179,31 @@ export async function finalizeSaleAction(formData: FormData) {
 }
 
 export async function recordSalePaymentAction(formData: FormData) {
-  return rpc<{ id: string }>("record_payment", {
-    p_idempotency_key: key("sale-payment"),
-    p_payload: {
-      contact_id: String(formData.get("customer_id")),
-      direction: "in",
-      amount: Number(formData.get("amount")),
-      payment_method: String(formData.get("payment_method") ?? "cash"),
-      payment_date: String(formData.get("payment_date") ?? ""),
-      reference_number: String(formData.get("reference_number") ?? "") || null,
-      notes: String(formData.get("notes") ?? "") || null,
-      auto_allocate: true,
-    },
-  })
+  try {
+    const saleId = String(formData.get("sale_id"))
+    const amount = Number(formData.get("amount"))
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Payment amount must be positive")
+    }
+
+    const payment = await rpc<{ id: string }>("record_sale_payment", {
+      p_idempotency_key: key("sale-payment"),
+      p_sale_id: saleId,
+      p_payload: {
+        amount,
+        payment_method: String(formData.get("payment_method") ?? "cash"),
+        reference_number: String(formData.get("reference_number") ?? "") || null,
+        notes: String(formData.get("notes") ?? "") || null,
+      },
+    })
+
+    if (!payment.ok) return payment
+
+    revalidatePath(`/sales/${saleId}`)
+    return { ok: true, data: payment.data } satisfies ActionResult<{ id: string }>
+  } catch (error) {
+    return fail(error)
+  }
 }
 
 export async function cancelSaleAction(formData: FormData) {

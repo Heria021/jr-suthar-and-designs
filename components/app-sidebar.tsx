@@ -10,7 +10,6 @@ import {
   MessagesSquareIcon,
   MoonIcon,
   PackageIcon,
-  ReceiptTextIcon,
   ShoppingCartIcon,
   StoreIcon,
   SunIcon,
@@ -18,12 +17,12 @@ import {
   UsersIcon,
   WalletCardsIcon,
 } from "lucide-react"
-import { useTheme } from "next-themes"
 
 import { signOut } from "@/app/auth/actions"
 import { GlobalSearch } from "@/components/global-search"
 import { NavMain } from "@/components/nav-main"
 import { TeamSwitcher } from "@/components/team-switcher"
+import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -69,12 +68,6 @@ const data = {
       title: "Contacts",
       url: "/contact",
       icon: <UsersIcon />,
-    },
-    {
-      title: "Invoices",
-      url: "/invoices",
-      icon: <ReceiptTextIcon />,
-      disabled: true,
     },
     {
       title: "Sales",

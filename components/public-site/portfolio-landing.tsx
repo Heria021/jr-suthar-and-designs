@@ -5,6 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { motion } from "motion/react"
 
+import { PublicSiteHeader } from "@/components/public-site/public-site-header"
 import type { PublicPortfolioProject } from "@/lib/portfolio/public-data"
 import { projectTypeLabels } from "@/lib/portfolio/types"
 
@@ -86,8 +87,21 @@ export function PortfolioLanding({
 }: {
   projects: PublicPortfolioProject[]
 }) {
+  function scrollToProjects() {
+    const projectsSection = document.getElementById("projects")
+
+    if (!projectsSection) {
+      return
+    }
+
+    projectsSection.scrollIntoView({ behavior: "smooth", block: "start" })
+    window.history.replaceState(null, "", "#projects")
+  }
+
   return (
     <main className="public-light-theme min-h-screen bg-background text-foreground">
+      <PublicSiteHeader heroAware />
+
       <section className="relative flex min-h-svh overflow-hidden bg-primary text-primary-foreground">
         <motion.img
           src="/pexels-ahmetcotur-31817155.jpg"
@@ -100,15 +114,6 @@ export function PortfolioLanding({
         <div className="absolute bottom-0 left-0 h-2/3 w-full bg-[radial-gradient(circle_at_bottom_left,var(--primary)_0%,transparent_62%)] opacity-55 md:w-2/3" />
 
         <div className="relative z-10 flex min-h-svh w-full flex-col px-5 py-8 sm:px-8 lg:px-12">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55 }}
-            className="text-sm font-medium tracking-wide text-primary-foreground/80"
-          >
-            JR Suthar & Designs
-          </motion.div>
-
           <motion.div
             initial="hidden"
             animate="show"
@@ -136,12 +141,13 @@ export function PortfolioLanding({
                 variants={heroItem}
                 className="mt-8 flex flex-wrap items-center gap-3"
               >
-                <a
-                  href="#projects"
+                <button
+                  type="button"
+                  onClick={scrollToProjects}
                   className="inline-flex h-11 items-center rounded-full border border-primary-foreground/25 bg-primary-foreground/10 px-5 text-sm font-semibold text-primary-foreground shadow-sm backdrop-blur-md transition-colors hover:bg-primary-foreground/20"
                 >
                   View projects
-                </a>
+                </button>
               </motion.div>
             </div>
 
@@ -350,12 +356,13 @@ export function PortfolioLanding({
               >
                 Contact studio
               </Link>
-              <a
-                href="#projects"
+              <button
+                type="button"
+                onClick={scrollToProjects}
                 className="inline-flex h-11 items-center rounded-full border border-primary-foreground/25 bg-primary-foreground/10 px-5 text-sm font-semibold text-primary-foreground shadow-sm backdrop-blur-md transition-colors hover:bg-primary-foreground/20"
               >
                 View projects
-              </a>
+              </button>
             </div>
           </div>
         </motion.div>

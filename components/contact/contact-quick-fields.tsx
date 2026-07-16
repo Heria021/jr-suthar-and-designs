@@ -1,7 +1,5 @@
 "use client"
 
-import { CheckIcon } from "lucide-react"
-
 import {
   Combobox,
   ComboboxContent,
@@ -58,20 +56,24 @@ export function ContactQuickFields({
   }
 
   function patchPhone(nextPhone: string) {
+    const contactId =
+      selected && nextPhone !== (selected.phone ?? "") ? "" : selectedId
     onChange({
       name,
       phone: nextPhone,
       address,
-      contactId: selectedId,
+      contactId,
     })
   }
 
   function patchAddress(nextAddress: string) {
+    const contactId =
+      selected && nextAddress !== (selected.address ?? "") ? "" : selectedId
     onChange({
       name,
       phone,
       address: nextAddress,
-      contactId: selectedId,
+      contactId,
     })
   }
 
@@ -114,23 +116,21 @@ export function ContactQuickFields({
               showClear
               className="w-full shadow-none"
             />
-            {name.trim() ? (
-              <ComboboxContent>
-                <ComboboxEmpty>No {kind} found. Keep typing to create new.</ComboboxEmpty>
-                <ComboboxList>
-                  {(contact: QuickContactOption) => (
-                    <ComboboxItem key={contact.id} value={contact}>
-                      <span className="min-w-0 flex-1 truncate">
-                        {contact.name}
-                      </span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {contact.phone ?? "No phone"}
-                      </span>
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            ) : null}
+            <ComboboxContent>
+              <ComboboxEmpty>No {kind} found. Keep typing to create new.</ComboboxEmpty>
+              <ComboboxList>
+                {(contact: QuickContactOption) => (
+                  <ComboboxItem key={contact.id} value={contact}>
+                    <span className="min-w-0 flex-1 truncate">
+                      {contact.name}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {contact.phone ?? "No phone"}
+                    </span>
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
           </Combobox>
         </div>
         <div className="space-y-2">
@@ -154,15 +154,7 @@ export function ContactQuickFields({
         />
       </div>
 
-      {selected ? (
-        <div className="flex items-center gap-2 rounded-md border bg-secondary/50 px-3 py-2 text-sm">
-          <CheckIcon className="size-4 text-emerald-600" />
-          <span className="font-medium">{selected.name}</span>
-          <span className="text-muted-foreground">
-            {selected.phone ?? "No phone"}
-          </span>
-        </div>
-      ) : name.trim() ? (
+      {!selected && name.trim() ? (
         <p className="text-xs text-muted-foreground">
           New {kind} will be created when you submit.
         </p>

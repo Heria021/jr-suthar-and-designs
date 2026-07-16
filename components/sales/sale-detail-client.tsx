@@ -32,7 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
@@ -70,8 +69,8 @@ function money(value: number) {
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" })
 
-function today() {
-  return new Date().toISOString().slice(0, 10)
+function modeLabel(mode: string) {
+  return mode === "loose" ? "Unit" : "Box"
 }
 
 function statusVariant(
@@ -93,6 +92,9 @@ export function SaleDetailClient({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [activeFinalizedForm, setActiveFinalizedForm] = useState<
+    "payment" | "cancel" | null
+  >(null)
   const isDraft = invoice.sale.status === "draft"
   const isFinalized = invoice.sale.status === "finalized"
   const isCancelled = invoice.sale.status === "cancelled"
@@ -271,51 +273,92 @@ export function SaleDetailClient({
 
       {/* Record payment + Cancel — finalized only */}
       {isFinalized && (
-        <>
-          <div className="space-y-3">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-foreground">Record payment</h2>
+              <h2 className="text-sm font-semibold text-foreground">Bill actions</h2>
               <p className="text-xs text-muted-foreground">
-                Log a payment received against this bill.
+                Record a received payment or cancel this bill.
               </p>
             </div>
-            <LaterPaymentPanel
-              saleId={invoice.sale.id}
-              customerId={invoice.sale.customer_id}
-              due={invoice.balance.due_amount}
-              pending={isPending}
-              onSubmit={(formData) =>
-                startTransition(() =>
-                  void run("Recording payment...", "Payment recorded", () =>
-                    recordSalePaymentAction(formData)
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={activeFinalizedForm === "payment" ? "default" : "secondary"}
+                className="gap-1.5 shadow-none"
+                onClick={() =>
+                  setActiveFinalizedForm((current) =>
+                    current === "payment" ? null : "payment"
                   )
-                )
-              }
-            />
-          </div>
-
-          <Separator className="my-2" />
-
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-foreground">Cancel bill</h2>
-              <p className="text-xs text-muted-foreground">
-                Paid bills must have payments reversed before cancellation.
-              </p>
+                }
+              >
+                <ReceiptIndianRupeeIcon className="size-3.5" />
+                Record payment
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={activeFinalizedForm === "cancel" ? "destructive" : "secondary"}
+                className="gap-1.5 shadow-none"
+                onClick={() =>
+                  setActiveFinalizedForm((current) =>
+                    current === "cancel" ? null : "cancel"
+                  )
+                }
+              >
+                <XCircleIcon className="size-3.5" />
+                Cancel bill
+              </Button>
             </div>
-            <CancelPanel
-              saleId={invoice.sale.id}
-              pending={isPending}
-              onSubmit={(formData) =>
-                startTransition(() =>
-                  void run("Cancelling bill...", "Bill cancelled", () =>
-                    cancelSaleAction(formData)
-                  )
-                )
-              }
-            />
           </div>
-        </>
+
+          {activeFinalizedForm === "payment" ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-foreground">Record payment</h2>
+                <p className="text-xs text-muted-foreground">
+                  Log a payment received against this bill.
+                </p>
+              </div>
+              <LaterPaymentPanel
+                saleId={invoice.sale.id}
+                customerId={invoice.sale.customer_id}
+                due={invoice.balance.due_amount}
+                pending={isPending}
+                onSubmit={(formData) =>
+                  startTransition(() =>
+                    void run("Recording payment...", "Payment recorded", () =>
+                      recordSalePaymentAction(formData)
+                    )
+                  )
+                }
+              />
+            </div>
+          ) : null}
+
+          {activeFinalizedForm === "cancel" ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-foreground">Cancel bill</h2>
+                <p className="text-xs text-muted-foreground">
+                  Paid bills must have payments reversed before cancellation.
+                </p>
+              </div>
+              <CancelPanel
+                saleId={invoice.sale.id}
+                pending={isPending}
+                onSubmit={(formData) =>
+                  startTransition(() =>
+                    void run("Cancelling bill...", "Bill cancelled", () =>
+                      cancelSaleAction(formData)
+                    )
+                  )
+                }
+              />
+            </div>
+          ) : null}
+        </div>
       )}
 
       {/* Cancelled notice */}
@@ -376,7 +419,7 @@ function AddItemPanel({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="loose">Loose</SelectItem>
+              <SelectItem value="loose">Unit</SelectItem>
               <SelectItem value="box">Box</SelectItem>
             </SelectContent>
           </Select>
@@ -450,7 +493,7 @@ function ItemsTable({
                 </TableCell>
               ) : (
                 <>
-                  <TableCell className="text-sm capitalize text-muted-foreground">{item.entry_mode}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{modeLabel(item.entry_mode)}</TableCell>
                   <TableCell className="text-sm text-foreground">
                     {item.entered_quantity} × {item.base_units_per_entry}
                   </TableCell>
@@ -517,7 +560,7 @@ function ItemEditRow({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="loose">Loose</SelectItem>
+          <SelectItem value="loose">Unit</SelectItem>
           <SelectItem value="box">Box</SelectItem>
         </SelectContent>
       </Select>
@@ -567,7 +610,6 @@ function FinalizePanel({
             </SelectContent>
           </Select>
         </div>
-        <TextInput label="Payment date" name="payment_date" type="date" defaultValue={today()} />
       </div>
       <div className="flex justify-end">
         <Button disabled={pending} type="submit" size="sm" className="shadow-none gap-1.5">
@@ -603,7 +645,6 @@ function LaterPaymentPanel({
       <input type="hidden" name="payment_method" value={method} />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput label="Amount" name="amount" type="number" step="0.01" defaultValue={String(Math.max(due, 0))} />
-        <TextInput label="Date" name="payment_date" type="date" defaultValue={today()} />
         <div className="space-y-2">
           <Label>Method</Label>
           <Select value={method} onValueChange={(v) => v && setMethod(v)}>
@@ -676,6 +717,8 @@ function TextInput({
   defaultValue?: string
   placeholder?: string
 }) {
+  const [value, setValue] = useState(defaultValue ?? "")
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
@@ -683,7 +726,8 @@ function TextInput({
         name={name}
         type={type}
         step={step}
-        defaultValue={defaultValue}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
         min={type === "number" ? "0" : undefined}
         className="shadow-none"

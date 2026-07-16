@@ -88,11 +88,10 @@ export async function getReportsData(): Promise<ReportsData> {
     supabase
       .from("payments")
       .select(
-        "id,payment_number,contact_id,direction,amount,payment_method,payment_date,status,created_at"
+        "id,payment_number,contact_id,direction,amount,payment_method,status,created_at"
       )
-      .gte("payment_date", startDate)
-      .lte("payment_date", today)
-      .order("payment_date", { ascending: false })
+      .gte("created_at", `${startDate}T00:00:00.000+05:30`)
+      .lte("created_at", `${today}T23:59:59.999+05:30`)
       .order("created_at", { ascending: false }),
     supabase
       .from("products")
@@ -158,7 +157,7 @@ export async function getReportsData(): Promise<ReportsData> {
     direction: payment.direction as "in" | "out",
     amount: Number(payment.amount),
     payment_method: payment.payment_method,
-    payment_date: payment.payment_date,
+    payment_date: payment.created_at,
     status: payment.status,
   }))
 

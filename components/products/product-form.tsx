@@ -141,8 +141,8 @@ export function payloadFromForm(
     name: form.name.trim(),
     sku: form.sku.trim() || null,
     unit_name: form.unit_name.trim(),
-    loose_sale_price: toNumber(form.loose_sale_price, "Loose sale price"),
-    loose_cost_price: toNumber(form.loose_cost_price, "Loose cost price"),
+    loose_sale_price: toNumber(form.loose_sale_price, "Unit sale price"),
+    loose_cost_price: toNumber(form.loose_cost_price, "Unit cost price"),
     has_box: form.has_box,
     box_units: null,
     box_sale_price: null,
@@ -231,14 +231,14 @@ export function ProductForm({
           onChange={(value) => patch({ reorder_level: value })}
         />
         <TextField
-          label="Loose sale price"
+          label="Unit sale price"
           type="number"
           step="0.01"
           value={form.loose_sale_price}
           onChange={(value) => patch({ loose_sale_price: value })}
         />
         <TextField
-          label="Loose cost price"
+          label="Unit cost price"
           type="number"
           step="0.01"
           value={form.loose_cost_price}
@@ -258,7 +258,7 @@ export function ProductForm({
         <span>
           <span className="font-semibold text-foreground">Has box pricing</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
-            Enable when the product is sold as both loose units and boxes.
+            Enable when the product is sold as both units and boxes.
           </span>
         </span>
         <Switch
@@ -347,11 +347,11 @@ export function ProductDetailsSection({
           <p className="text-xl font-bold text-foreground mt-1">{money(stockValue)}</p>
         </div>
         <div>
-          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Loose Sale</span>
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Unit Sale</span>
           <p className="text-xl font-bold text-foreground mt-1">{money(product.loose_sale_price)}</p>
         </div>
         <div>
-          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Loose Cost</span>
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Unit Cost</span>
           <p className="text-xl font-bold text-foreground mt-1">{money(product.loose_cost_price)}</p>
         </div>
       </div>

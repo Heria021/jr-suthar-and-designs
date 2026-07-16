@@ -10,7 +10,6 @@ import {
   createCompleteSaleAction,
   type SalePaymentMethod,
 } from "@/app/(app)/sales/actions"
-import { createContactAction } from "@/app/(app)/contact/actions"
 import { ContactQuickFields } from "@/components/contact/contact-quick-fields"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -40,7 +39,6 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { DatePicker } from "@/components/ui/date-picker"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,7 +113,7 @@ export function NewSaleWorkspace({
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
   const [customerAddress, setCustomerAddress] = useState("")
-  const [saleDate, setSaleDate] = useState(today())
+  const saleDate = today()
 
   // Items
   const [items, setItems] = useState<DraftItem[]>(() =>
@@ -127,7 +125,6 @@ export function NewSaleWorkspace({
   const [discount, setDiscount] = useState("0")
   const [paymentAmount, setPaymentAmount] = useState("0")
   const [paymentMethod, setPaymentMethod] = useState<SalePaymentMethod>("cash")
-  const [paymentDate, setPaymentDate] = useState(today())
   const [paymentReference, setPaymentReference] = useState("")
 
   // Notes
@@ -229,34 +226,18 @@ export function NewSaleWorkspace({
 
         if (discountAmount > totals.subtotal)
           throw new Error("Discount cannot exceed subtotal")
+        if (initialPaymentAmount > totals.total)
+          throw new Error("Payment cannot exceed bill total")
 
-        const toastId = toast.loading(
-          customerId ? "Creating invoice..." : "Creating customer..."
-        )
-        let resolvedCustomerId = customerId
+        const toastId = toast.loading("Creating invoice...")
 
-        if (!resolvedCustomerId) {
-          const created = await createContactAction({
+        const result = await createCompleteSaleAction({
+          customer_id: customerId || null,
+          customer: {
             name: customerName.trim(),
             phone: customerPhone.trim() || null,
             address: customerAddress.trim() || null,
-            contact_type: "customer",
-            opening_balance: 0,
-            opening_balance_date: today(),
-            notes: null,
-          })
-
-          if (!created.ok) {
-            toast.error(created.error, { id: toastId })
-            return
-          }
-
-          resolvedCustomerId = created.data.id
-          toast.loading("Creating invoice...", { id: toastId })
-        }
-
-        const result = await createCompleteSaleAction({
-          customer_id: resolvedCustomerId,
+          },
           sale_date: saleDate,
           discount_amount: discountAmount,
           notes: notes.trim() || null,
@@ -266,7 +247,6 @@ export function NewSaleWorkspace({
               ? {
                   amount: initialPaymentAmount,
                   payment_method: paymentMethod,
-                  payment_date: paymentDate,
                   reference_number: paymentReference.trim() || null,
                   notes: "Initial invoice payment",
                 }
@@ -292,280 +272,253 @@ export function NewSaleWorkspace({
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex w-full flex-col gap-8">
-
-      {/* Page header */}
-      <div className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1.5">
+    <div className="flex w-full flex-col gap-5 pb-6">
+      <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">New Bill</h1>
           <p className="text-sm text-muted-foreground">
-            Type or select a customer, add items, then record the initial payment.
+            Select customer, add products, collect payment.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            className="shadow-none gap-1.5"
-            onClick={submit}
-            disabled={isPending || !products.length}
-          >
-            <SaveIcon className="size-3.5" />
-            {isPending ? "Creating..." : "Create invoice"}
-          </Button>
           <Link
             href="/sales"
             className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "shadow-none")}
           >
             Back
           </Link>
+          <Button
+            size="sm"
+            className="gap-1.5 shadow-none"
+            onClick={submit}
+            disabled={isPending || !products.length}
+          >
+            <SaveIcon className="size-3.5" />
+            {isPending ? "Creating..." : "Create invoice"}
+          </Button>
         </div>
       </div>
 
-      {/* ── Bill details ──────────────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold text-foreground">Bill details</h2>
-          <p className="text-xs text-muted-foreground">Customer and invoice date.</p>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <ContactQuickFields
-            label="Customer"
-            kind="customer"
-            options={customers}
-            name={customerName}
-            phone={customerPhone}
-            address={customerAddress}
-            selectedId={customerId}
-            onChange={(value) => {
-              setCustomerName(value.name)
-              setCustomerPhone(value.phone)
-              setCustomerAddress(value.address)
-              setCustomerId(value.contactId)
-            }}
+      <div className="space-y-5">
+        <section className="space-y-3">
+          <SectionHeader
+            title="Customer"
+            description="Type a new customer or select an existing one."
           />
-          <div className="space-y-2">
-            <Label>Invoice date</Label>
-            <DatePicker value={saleDate} onChange={setSaleDate} />
+          <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <ContactQuickFields
+              label="Customer"
+              kind="customer"
+              options={customers}
+              name={customerName}
+              phone={customerPhone}
+              address={customerAddress}
+              selectedId={customerId}
+              onChange={(value) => {
+                setCustomerName(value.name)
+                setCustomerPhone(value.phone)
+                setCustomerAddress(value.address)
+                setCustomerId(value.contactId)
+              }}
+            />
+            <div className="flex flex-col gap-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="min-h-20 flex-1 shadow-none"
+                placeholder="Optional"
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Items ─────────────────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold text-foreground">Items</h2>
-          <p className="text-xs text-muted-foreground">
-            Add products to this bill. Each product can only be added once.
-          </p>
-        </div>
+        <section className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <SectionHeader title="Items" description={`${items.length} item${items.length === 1 ? "" : "s"} in bill`} />
+            <div className="flex items-center gap-2">
+              {allProductsUsed && products.length > 0 ? (
+                <span className="text-xs text-muted-foreground">All products added</span>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="gap-1.5 shadow-none"
+                onClick={addItem}
+                disabled={!products.length || allProductsUsed}
+              >
+                <PlusIcon className="size-3.5" />
+                Add item
+              </Button>
+            </div>
+          </div>
 
-        <div className="overflow-hidden rounded-lg border bg-secondary/50">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-secondary/60">
-                <TableHead className="h-10 px-4 text-xs font-medium text-muted-foreground min-w-48">Product</TableHead>
-                <TableHead className="h-10 text-xs font-medium text-muted-foreground w-36">Mode</TableHead>
-                <TableHead className="h-10 text-xs font-medium text-muted-foreground w-24">Qty</TableHead>
-                <TableHead className="h-10 text-xs font-medium text-muted-foreground w-32">Rate</TableHead>
-                <TableHead className="h-10 text-xs font-medium text-muted-foreground">Total</TableHead>
-                <TableHead className="h-10 w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => {
-                const product = products.find((p) => p.id === item.product_id)
-                const qty = Number(item.quantity) || 0
-                const rate = Number(item.price_per_entry) || 0
-
-                return (
-                  <TableRow key={item.localId} className="hover:bg-secondary/40">
-                    <TableCell className="px-4 py-2">
-                      <SaleProductCombobox
-                        product={product}
-                        products={products}
-                        usedProductIds={usedProductIds}
-                        onSelect={(productId) =>
-                          handleProductChange(item.localId, productId)
-                        }
-                      />
-                    </TableCell>
-
-                    {/* Mode select */}
-                    <TableCell className="py-2">
-                      <Select
-                        value={item.entry_mode}
-                        onValueChange={(v) =>
-                          v && handleModeChange(item.localId, v as DraftItem["entry_mode"])
-                        }
-                      >
-                        <SelectTrigger className="shadow-none h-9">
-                          <SelectValue>
-                            {item.entry_mode === "loose" ? "Loose" : "Box"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="loose">Loose</SelectItem>
-                          <SelectItem value="box" disabled={!product?.has_box}>
-                            Box
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-
-                    {/* Qty */}
-                    <TableCell className="py-2">
-                      <Input
-                        className="w-20 shadow-none h-9"
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => patchItem(item.localId, { quantity: e.target.value })}
-                      />
-                    </TableCell>
-
-                    {/* Rate */}
-                    <TableCell className="py-2">
-                      <Input
-                        className="w-28 shadow-none h-9"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.price_per_entry}
-                        onChange={(e) => patchItem(item.localId, { price_per_entry: e.target.value })}
-                      />
-                    </TableCell>
-
-                    {/* Line total */}
-                    <TableCell className="text-sm font-medium text-foreground whitespace-nowrap">
-                      {money(qty * rate)}
-                    </TableCell>
-
-                    {/* Remove */}
-                    <TableCell className="py-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="shadow-none text-destructive hover:text-destructive hover:bg-destructive/10 h-9 w-9 p-0"
-                        onClick={() => removeItem(item.localId)}
-                      >
-                        <Trash2Icon className="size-3.5" />
-                      </Button>
-                    </TableCell>
+          <div className="overflow-hidden rounded-lg border bg-secondary/40">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-secondary/60">
+                    <TableHead className="h-9 min-w-72 px-4 text-xs font-medium text-muted-foreground">Product</TableHead>
+                    <TableHead className="h-9 w-32 text-xs font-medium text-muted-foreground">Mode</TableHead>
+                    <TableHead className="h-9 w-24 text-xs font-medium text-muted-foreground">Qty</TableHead>
+                    <TableHead className="h-9 w-32 text-xs font-medium text-muted-foreground">Rate</TableHead>
+                    <TableHead className="h-9 w-32 text-xs font-medium text-muted-foreground">Line total</TableHead>
+                    <TableHead className="h-9 w-10" />
                   </TableRow>
-                )
-              })}
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => {
+                    const product = products.find((p) => p.id === item.product_id)
+                    const qty = Number(item.quantity) || 0
+                    const rate = Number(item.price_per_entry) || 0
 
-              {!items.length && (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
-                    Add at least one item to the bill.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                    return (
+                      <TableRow key={item.localId} className="hover:bg-secondary/40">
+                        <TableCell className="px-4 py-1.5">
+                          <SaleProductCombobox
+                            product={product}
+                            products={products}
+                            usedProductIds={usedProductIds}
+                            onSelect={(productId) =>
+                              handleProductChange(item.localId, productId)
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <Select
+                            value={item.entry_mode}
+                            onValueChange={(v) =>
+                              v && handleModeChange(item.localId, v as DraftItem["entry_mode"])
+                            }
+                          >
+                            <SelectTrigger className="h-9 shadow-none">
+                              <SelectValue>
+                                {item.entry_mode === "loose" ? "Unit" : "Box"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="loose">Unit</SelectItem>
+                              <SelectItem value="box" disabled={!product?.has_box}>
+                                Box
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <Input
+                            className="h-9 w-20 shadow-none"
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => patchItem(item.localId, { quantity: e.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <Input
+                            className="h-9 w-28 shadow-none"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.price_per_entry}
+                            onChange={(e) => patchItem(item.localId, { price_per_entry: e.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm font-medium text-foreground">
+                          {money(qty * rate)}
+                        </TableCell>
+                        <TableCell className="py-1.5 pr-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 w-9 p-0 text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => removeItem(item.localId)}
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
 
-        {/* Add item — own row below the table */}
-        <div className="flex justify-start">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="shadow-none gap-1.5"
-            onClick={addItem}
-            disabled={!products.length || allProductsUsed}
-          >
-            <PlusIcon className="size-3.5" />
-            Add item
-          </Button>
-          {allProductsUsed && products.length > 0 && (
-            <p className="ml-3 self-center text-xs text-muted-foreground">
-              All products have been added.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* ── Payment & Discount ────────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold text-foreground">Payment &amp; discount</h2>
-          <p className="text-xs text-muted-foreground">
-            Apply a discount and record the initial payment received.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <TextField label="Discount" type="number" step="0.01" value={discount} onChange={setDiscount} />
-          <TextField label="Initial payment" type="number" step="0.01" value={paymentAmount} onChange={setPaymentAmount} />
-
-          <div className="space-y-2">
-            <Label>Payment method</Label>
-            <Select
-              value={paymentMethod}
-              onValueChange={(v) => v && setPaymentMethod(v as SalePaymentMethod)}
-            >
-              <SelectTrigger className="w-full shadow-none">
-                <SelectValue>
-                  {({ cash: "Cash", upi: "UPI", bank: "Bank", card: "Card", other: "Other" } as Record<string, string>)[paymentMethod]}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="upi">UPI</SelectItem>
-                <SelectItem value="bank">Bank</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Payment date</Label>
-            <DatePicker value={paymentDate} onChange={setPaymentDate} />
-          </div>
-          <TextField label="Reference" value={paymentReference} onChange={setPaymentReference} placeholder="Optional" />
-
-          {/* Totals summary */}
-          <div className="space-y-1.5 rounded-lg border bg-secondary/50 px-4 py-3 text-sm sm:col-span-2 lg:col-span-1">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal</span>
-              <span>{money(totals.subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Discount</span>
-              <span>− {money(totals.discountAmount)}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-foreground border-t border-border/40 pt-1.5 mt-1">
-              <span>Total</span>
-              <span>{money(totals.total)}</span>
-            </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Paid</span>
-              <span>− {money(totals.paid)}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-foreground">
-              <span>Due</span>
-              <span className={totals.due > 0 ? "text-destructive" : ""}>{money(totals.due)}</span>
+                  {!items.length ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
+                        Add at least one item to the bill.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Notes ─────────────────────────────────────────────────────────── */}
-      <section className="space-y-3 pb-4">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold text-foreground">Notes</h2>
-          <p className="text-xs text-muted-foreground">Optional notes for this bill.</p>
-        </div>
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="min-h-20 shadow-none"
-          placeholder="Optional"
-        />
-      </section>
+        <section className="space-y-3">
+          <SectionHeader
+            title="Payment & totals"
+            description="Apply discount, record payment, and review the bill."
+          />
+          <div className="grid gap-5 rounded-lg border bg-secondary/40 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="Discount"
+                type="number"
+                step="0.01"
+                value={discount}
+                onChange={setDiscount}
+              />
+              <TextField
+                label="Initial payment"
+                type="number"
+                step="0.01"
+                value={paymentAmount}
+                onChange={setPaymentAmount}
+              />
+              <div className="space-y-2">
+                <Label>Payment method</Label>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(v) => v && setPaymentMethod(v as SalePaymentMethod)}
+                >
+                  <SelectTrigger className="h-9 w-full shadow-none">
+                    <SelectValue>
+                      {({ cash: "Cash", upi: "UPI", bank: "Bank", card: "Card", other: "Other" } as Record<string, string>)[paymentMethod]}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="bank">Bank</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <TextField
+                label="Reference"
+                value={paymentReference}
+                onChange={setPaymentReference}
+                placeholder="Optional"
+              />
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <AmountRow label="Subtotal" value={money(totals.subtotal)} />
+              <AmountRow label="Discount" value={`- ${money(totals.discountAmount)}`} muted />
+              <AmountRow label="Total" value={money(totals.total)} strong border />
+              <AmountRow label="Paid" value={`- ${money(totals.paid)}`} muted />
+              <AmountRow
+                label="Due"
+                value={money(totals.due)}
+                strong
+                danger={totals.due > 0}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
@@ -585,11 +538,10 @@ function SaleProductCombobox({
   const availableProducts = products.filter(
     (entry) => !usedProductIds.has(entry.id) || entry.id === product?.id
   )
-  const shouldShowList = inputValue.trim().length > 0
 
   return (
     <Combobox<InvoiceProductOption>
-      items={shouldShowList ? availableProducts : []}
+      items={availableProducts}
       value={product ?? null}
       inputValue={inputValue}
       itemToStringLabel={(entry) => entry.name}
@@ -606,22 +558,69 @@ function SaleProductCombobox({
         placeholder="Search product"
         className="h-9 w-full max-w-[320px] shadow-none"
       />
-      {shouldShowList ? (
-        <ComboboxContent>
-          <ComboboxEmpty>No products found.</ComboboxEmpty>
-          <ComboboxList>
-            {(entry: InvoiceProductOption) => (
-              <ComboboxItem key={entry.id} value={entry}>
-                <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  stock {entry.stock_on_hand}
-                </span>
-              </ComboboxItem>
-            )}
-          </ComboboxList>
-        </ComboboxContent>
-      ) : null}
+      <ComboboxContent>
+        <ComboboxEmpty>No products found.</ComboboxEmpty>
+        <ComboboxList>
+          {(entry: InvoiceProductOption) => (
+            <ComboboxItem key={entry.id} value={entry}>
+              <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                stock {entry.stock_on_hand}
+              </span>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
     </Combobox>
+  )
+}
+
+function SectionHeader({
+  title,
+  description,
+}: {
+  title: string
+  description?: string
+}) {
+  return (
+    <div className="space-y-0.5">
+      <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+      {description ? (
+        <p className="text-xs text-muted-foreground">{description}</p>
+      ) : null}
+    </div>
+  )
+}
+
+function AmountRow({
+  label,
+  value,
+  muted,
+  strong,
+  border,
+  danger,
+}: {
+  label: string
+  value: string
+  muted?: boolean
+  strong?: boolean
+  border?: boolean
+  danger?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4",
+        border && "border-t border-border/50 pt-2",
+        muted && "text-muted-foreground",
+        strong && "font-semibold text-foreground"
+      )}
+    >
+      <span>{label}</span>
+      <span className={cn("tabular-nums", danger && "text-destructive")}>
+        {value}
+      </span>
+    </div>
   )
 }
 
@@ -652,7 +651,7 @@ function TextField({
         placeholder={placeholder}
         min={type === "number" ? "0" : undefined}
         onChange={(e) => onChange(e.target.value)}
-        className="shadow-none"
+        className="h-9 shadow-none"
       />
     </div>
   )

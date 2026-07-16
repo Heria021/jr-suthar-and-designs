@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowDownUpIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -52,10 +51,8 @@ type PaymentFormState = {
   direction: "in" | "out"
   amount: string
   payment_method: PaymentPayload["payment_method"]
-  payment_date: string
   reference_number: string
   notes: string
-  auto_allocate: boolean
 }
 
 const moneyFormatter = new Intl.NumberFormat("en-IN", {
@@ -88,10 +85,8 @@ function paymentDefaults(contact: ContactDetail): PaymentFormState {
     direction: canReceive ? "in" : "out",
     amount: "",
     payment_method: "cash",
-    payment_date: new Date().toISOString().slice(0, 10),
     reference_number: "",
     notes: "",
-    auto_allocate: true,
   }
 }
 
@@ -422,19 +417,12 @@ function DetailLine({ label, value }: { label: string; value: string }) {
 // ─── Statement Section ────────────────────────────────────────────────────────
 
 function StatementSection({ statement }: { statement: ContactStatementRow[] }) {
-  const [latestFirst, setLatestFirst] = useState(true)
-  const sortedStatement = [...statement].sort((a, b) => {
-    const aTime = new Date(a.entry_date ?? 0).getTime()
-    const bTime = new Date(b.entry_date ?? 0).getTime()
-    return latestFirst ? bTime - aTime : aTime - bTime
-  })
-
   return (
     <div className="space-y-3">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold text-foreground">Account statement</h2>
         <p className="text-xs text-muted-foreground">
-          {latestFirst ? "Latest transactions first." : "Oldest transactions first."}
+          Latest transactions first.
         </p>
       </div>
       <div className="overflow-hidden rounded-lg border bg-secondary/50">
@@ -442,36 +430,41 @@ function StatementSection({ statement }: { statement: ContactStatementRow[] }) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-secondary/60">
-                <TableHead className="h-10 px-4 text-xs font-medium text-muted-foreground">Date</TableHead>
+                <TableHead className="h-10 px-4 text-xs font-medium text-muted-foreground">Date & time</TableHead>
                 <TableHead className="h-10 text-xs font-medium text-muted-foreground">Type</TableHead>
                 <TableHead className="h-10 text-xs font-medium text-muted-foreground">Description</TableHead>
                 <TableHead className="h-10 text-xs font-medium text-muted-foreground">Debit</TableHead>
                 <TableHead className="h-10 text-xs font-medium text-muted-foreground">Credit</TableHead>
                 <TableHead className="h-10 px-4 text-xs font-medium text-muted-foreground">
-                  <button
-                    type="button"
-                    onClick={() => setLatestFirst((value) => !value)}
-                    className="ml-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    title={latestFirst ? "Show oldest first" : "Show latest first"}
-                  >
-                    Balance
-                    <ArrowDownUpIcon className="size-3.5" />
-                  </button>
+                  Balance
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedStatement.map((entry) => (
+              {statement.map((entry) => (
                 <TableRow
                   key={`${entry.entry_type}-${entry.reference_id}`}
                   className="transition-colors hover:bg-secondary/40"
                 >
                   <TableCell className="px-4 py-3 text-sm">
-                    {entry.entry_date
-                      ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(
-                        new Date(entry.entry_date)
-                      )
-                      : "—"}
+                    {entry.entry_at || entry.entry_date ? (
+                      <span className="flex flex-col gap-0.5">
+                        <span>
+                          {new Intl.DateTimeFormat("en-IN", {
+                            dateStyle: "medium",
+                          }).format(new Date(entry.entry_at ?? entry.entry_date ?? ""))}
+                        </span>
+                        {entry.entry_at ? (
+                          <span className="text-xs text-muted-foreground">
+                            {new Intl.DateTimeFormat("en-IN", {
+                              timeStyle: "short",
+                            }).format(new Date(entry.entry_at))}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-sm capitalize text-muted-foreground">
                     {entry.entry_type}
@@ -649,10 +642,9 @@ function PaymentForm({
             direction: form.direction,
             amount,
             payment_method: form.payment_method,
-            payment_date: form.payment_date,
             reference_number: form.reference_number.trim() || null,
             notes: form.notes.trim() || null,
-            auto_allocate: form.auto_allocate,
+            auto_allocate: true,
           })
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "Check payment")
@@ -705,26 +697,11 @@ function PaymentForm({
           </Select>
         </div>
         <TextField
-          label="Date"
-          type="date"
-          value={form.payment_date}
-          onChange={(value) => patch({ payment_date: value })}
-        />
-        <TextField
           label="Reference"
           value={form.reference_number}
           onChange={(value) => patch({ reference_number: value })}
           placeholder="Optional"
         />
-        <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm cursor-pointer self-end">
-          <input
-            type="checkbox"
-            checked={form.auto_allocate}
-            onChange={(event) => patch({ auto_allocate: event.target.checked })}
-            className="size-4"
-          />
-          Auto allocate to oldest pending documents
-        </label>
       </div>
       <div className="space-y-2">
         <Label>Notes</Label>

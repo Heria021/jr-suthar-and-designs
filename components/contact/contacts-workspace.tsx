@@ -118,6 +118,39 @@ function payloadFromForm(form: ContactFormState): ContactPayload {
   }
 }
 
+function openingBalanceCopy(type: ContactPayload["contact_type"]) {
+  if (type === "supplier") {
+    return {
+      helper: "Use this only for old supplier balances before this ERP.",
+      options: [
+        ["none", "No balance"],
+        ["owes", "Payment due"],
+        ["advance", "Advance paid"],
+      ] as const,
+    }
+  }
+
+  if (type === "both") {
+    return {
+      helper: "Use this only when this contact already has an old balance.",
+      options: [
+        ["none", "No balance"],
+        ["owes", "Payment due"],
+        ["advance", "Overpaid / advance"],
+      ] as const,
+    }
+  }
+
+  return {
+    helper: "Use this only for old customer balances before this ERP.",
+    options: [
+      ["none", "No balance"],
+      ["owes", "Payment due"],
+      ["advance", "Advance received"],
+    ] as const,
+  }
+}
+
 export function ContactsWorkspace({
   initialContacts,
 }: {
@@ -355,12 +388,7 @@ function ContactForm({
   onCancel: () => void
 }) {
   const [form, setForm] = useState(emptyForm())
-  const balanceLabel =
-    form.contact_type === "supplier" ? "We owe them" : "They owe us"
-  const advanceLabel =
-    form.contact_type === "supplier"
-      ? "We have advance with them"
-      : "They have advance with us"
+  const openingBalance = openingBalanceCopy(form.contact_type)
 
   function patch(update: Partial<ContactFormState>) {
     setForm((current) => ({ ...current, ...update }))
@@ -420,11 +448,7 @@ function ContactForm({
       <div className="space-y-2">
         <Label>Opening balance</Label>
         <div className="grid gap-2 sm:grid-cols-3">
-          {[
-            ["none", "No previous balance"],
-            ["owes", balanceLabel],
-            ["advance", advanceLabel],
-          ].map(([value, label]) => (
+          {openingBalance.options.map(([value, label]) => (
             <Button
               key={value}
               type="button"
@@ -442,6 +466,7 @@ function ContactForm({
             </Button>
           ))}
         </div>
+        <p className="text-xs text-muted-foreground">{openingBalance.helper}</p>
       </div>
 
       {form.opening_balance_mode !== "none" ? (

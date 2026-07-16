@@ -187,7 +187,7 @@ export function ProductDetailWorkspace({
               <div className="space-y-1">
                 <h2 className="text-sm font-semibold text-foreground">Edit details</h2>
                 <p className="text-xs text-muted-foreground">
-                  Update product name, sku, unit, loose prices, or box pricing details.
+                  Update product name, sku, unit prices, or box pricing details.
                 </p>
               </div>
               <ProductForm

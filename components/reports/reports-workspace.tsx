@@ -1,14 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -22,6 +18,7 @@ import {
   numberText,
   preciseMoney,
 } from "@/lib/dashboard/formatters"
+import { cn } from "@/lib/utils"
 import type {
   BalanceReportRow,
   PaymentReportRow,
@@ -34,6 +31,17 @@ import type {
 } from "@/lib/reports/types"
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" })
+
+const reportOptions = [
+  { value: "sales", label: "Sales" },
+  { value: "purchases", label: "Purchases" },
+  { value: "payments", label: "Payments" },
+  { value: "stock", label: "Stock" },
+  { value: "balances", label: "Balances" },
+  { value: "profit", label: "Profit" },
+] as const
+
+type ReportView = (typeof reportOptions)[number]["value"]
 
 function formatMetric(metric: ReportMetric) {
   if (metric.kind === "money") return money(metric.value)
@@ -64,6 +72,8 @@ function stockVariant(
 }
 
 export function ReportsWorkspace({ data }: { data: ReportsData }) {
+  const [activeReport, setActiveReport] = useState<ReportView>("sales")
+
   return (
     <div className="flex w-full flex-col gap-8">
       {/* Page header */}
@@ -82,64 +92,61 @@ export function ReportsWorkspace({ data }: { data: ReportsData }) {
         </span>
       </div>
 
-      <Tabs defaultValue="sales" className="w-full">
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0">
-          {(
-            [
-              { value: "sales", label: "Sales" },
-              { value: "purchases", label: "Purchases" },
-              { value: "payments", label: "Payments" },
-              { value: "stock", label: "Stock" },
-              { value: "balances", label: "Balances" },
-              { value: "profit", label: "Profit" },
-            ] as const
-          ).map(({ value, label }) => (
-            <TabsTrigger
+      <div className="space-y-5">
+        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {reportOptions.map(({ value, label }) => (
+            <Button
               key={value}
-              value={value}
-              className="h-8 rounded-md border bg-secondary/50 px-3 text-xs font-medium text-muted-foreground shadow-none transition-colors hover:bg-secondary hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+              type="button"
+              onClick={() => setActiveReport(value)}
+              className={cn(
+                "h-auto justify-start rounded-md border px-3 py-2 text-left text-xs font-medium shadow-none",
+                activeReport === value
+                  ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
             >
               {label}
-            </TabsTrigger>
+            </Button>
           ))}
-        </TabsList>
+        </div>
 
-        <TabsContent value="sales" className="mt-5">
+        {activeReport === "sales" ? (
           <ReportSection metrics={data.sales.metrics}>
             <SalesTable rows={data.sales.rows} />
           </ReportSection>
-        </TabsContent>
+        ) : null}
 
-        <TabsContent value="purchases" className="mt-5">
+        {activeReport === "purchases" ? (
           <ReportSection metrics={data.purchases.metrics}>
             <PurchasesTable rows={data.purchases.rows} />
           </ReportSection>
-        </TabsContent>
+        ) : null}
 
-        <TabsContent value="payments" className="mt-5">
+        {activeReport === "payments" ? (
           <ReportSection metrics={data.payments.metrics}>
             <PaymentsTable rows={data.payments.rows} />
           </ReportSection>
-        </TabsContent>
+        ) : null}
 
-        <TabsContent value="stock" className="mt-5">
+        {activeReport === "stock" ? (
           <ReportSection metrics={data.stock.metrics}>
             <StockTable rows={data.stock.rows} />
           </ReportSection>
-        </TabsContent>
+        ) : null}
 
-        <TabsContent value="balances" className="mt-5">
+        {activeReport === "balances" ? (
           <ReportSection metrics={data.balances.metrics}>
             <BalancesTable rows={data.balances.rows} />
           </ReportSection>
-        </TabsContent>
+        ) : null}
 
-        <TabsContent value="profit" className="mt-5">
+        {activeReport === "profit" ? (
           <ReportSection metrics={data.profit.metrics}>
             <ProfitTable rows={data.profit.rows} />
           </ReportSection>
-        </TabsContent>
-      </Tabs>
+        ) : null}
+      </div>
     </div>
   )
 }

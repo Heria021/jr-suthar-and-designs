@@ -21,8 +21,10 @@ export type SaleInvoiceData = {
   }
   items: {
     id: string
+    product_id: string
     product_name_snapshot: string
     entry_mode: string
+    unit_name: string
     entered_quantity: number
     base_units_per_entry: number
     base_quantity: number
@@ -38,6 +40,9 @@ export type SaleInvoiceData = {
     payment_number: string
     payment_date: string
     payment_method: string
+    direction: "in" | "out"
+    status: string
+    allocated_amount: number
     amount: number
   }[]
 }
@@ -53,7 +58,7 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
     supabase
       .from("sale_items")
       .select(
-        "id,product_name_snapshot,entry_mode,entered_quantity,base_units_per_entry,base_quantity,price_per_entry,line_total"
+        "id,product_id,product_name_snapshot,entry_mode,entered_quantity,base_units_per_entry,base_quantity,price_per_entry,line_total"
       )
       .eq("sale_id", id)
       .order("created_at", { ascending: true }),
@@ -83,13 +88,22 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
 
   if (customerError) throw new Error(customerError.message)
 
-  const paymentIds = (allocations ?? []).map((allocation) => allocation.payment_id)
+  const allocationRows = allocations ?? []
+  const productIds = (items ?? []).map((item) => item.product_id)
+  const { data: products } = productIds.length
+    ? await supabase.from("products").select("id,unit_name").in("id", productIds)
+    : { data: [] }
+  const productUnitMap = new Map(
+    (products ?? []).map((product) => [product.id, product.unit_name])
+  )
+  const paymentIds = allocationRows.map((allocation) => allocation.payment_id)
   const { data: payments } = paymentIds.length
     ? await supabase
         .from("payments")
-        .select("id,payment_number,payment_date,payment_method,amount")
+        .select("id,payment_number,created_at,payment_method,direction,status,reversed_payment_id")
         .in("id", paymentIds)
     : { data: [] }
+  const paymentMap = new Map((payments ?? []).map((payment) => [payment.id, payment]))
 
   return {
     sale: {
@@ -101,6 +115,7 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
     customer,
     items: (items ?? []).map((item) => ({
       ...item,
+      unit_name: productUnitMap.get(item.product_id) ?? "unit",
       price_per_entry: Number(item.price_per_entry),
       line_total: Number(item.line_total),
     })),
@@ -109,11 +124,23 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
       due_amount: Number(balance.due_amount),
       payment_status: balance.payment_status,
     },
-    payments: (payments ?? []).map((payment) => ({
-      payment_number: payment.payment_number,
-      payment_date: payment.payment_date,
-      payment_method: payment.payment_method,
-      amount: Number(payment.amount),
-    })),
+    payments: allocationRows
+      .map((allocation) => {
+        const payment = paymentMap.get(allocation.payment_id)
+        if (!payment) return null
+        const allocatedAmount = Number(allocation.allocated_amount)
+        return {
+          payment_number: payment.payment_number,
+          payment_date: payment.created_at,
+          payment_method: payment.payment_method,
+          direction: payment.direction as "in" | "out",
+          status: payment.status,
+          allocated_amount: allocatedAmount,
+          amount: payment.direction === "in" ? allocatedAmount : -allocatedAmount,
+        }
+      })
+      .filter((payment): payment is SaleInvoiceData["payments"][number] =>
+        Boolean(payment)
+      ),
   }
 }
