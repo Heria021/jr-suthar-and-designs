@@ -34,6 +34,9 @@ export type SaleInvoiceData = {
   balance: {
     paid_amount: number
     due_amount: number
+    previous_due_amount: number
+    total_due_amount: number
+    show_previous_balance: boolean
     payment_status: string
   }
   payments: {
@@ -73,7 +76,12 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
   if (itemsError) throw new Error(itemsError.message)
   if (balanceError) throw new Error(balanceError.message)
 
-  const [{ data: customer, error: customerError }, { data: allocations }] =
+  const [
+    { data: customer, error: customerError },
+    { data: allocations },
+    { data: contactBalance, error: contactBalanceError },
+    { data: latestSale, error: latestSaleError },
+  ] =
     await Promise.all([
       supabase
         .from("contacts")
@@ -84,9 +92,26 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
         .from("payment_allocations")
         .select("payment_id,allocated_amount")
         .eq("sale_id", id),
+      supabase
+        .from("contact_balances")
+        .select("customer_balance")
+        .eq("contact_id", sale.customer_id)
+        .single(),
+      supabase
+        .from("sales")
+        .select("id")
+        .eq("customer_id", sale.customer_id)
+        .eq("status", "finalized")
+        .order("sale_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("sale_number", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ])
 
   if (customerError) throw new Error(customerError.message)
+  if (contactBalanceError) throw new Error(contactBalanceError.message)
+  if (latestSaleError) throw new Error(latestSaleError.message)
 
   const allocationRows = allocations ?? []
   const productIds = (items ?? []).map((item) => item.product_id)
@@ -105,6 +130,15 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
     : { data: [] }
   const paymentMap = new Map((payments ?? []).map((payment) => [payment.id, payment]))
 
+  const invoiceDueAmount = Number(balance.due_amount)
+  const isLatestFinalizedSale = latestSale?.id === sale.id
+  const totalDueAmount = isLatestFinalizedSale
+    ? Math.max(Number(contactBalance.customer_balance), 0)
+    : invoiceDueAmount
+  const previousDueAmount = isLatestFinalizedSale
+    ? Math.max(totalDueAmount - invoiceDueAmount, 0)
+    : 0
+
   return {
     sale: {
       ...sale,
@@ -121,7 +155,10 @@ export async function getSaleInvoiceData(id: string): Promise<SaleInvoiceData> {
     })),
     balance: {
       paid_amount: Number(balance.paid_amount),
-      due_amount: Number(balance.due_amount),
+      due_amount: invoiceDueAmount,
+      previous_due_amount: previousDueAmount,
+      total_due_amount: totalDueAmount,
+      show_previous_balance: isLatestFinalizedSale && previousDueAmount > 0,
       payment_status: balance.payment_status,
     },
     payments: allocationRows

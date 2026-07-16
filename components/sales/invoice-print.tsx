@@ -150,10 +150,16 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
             label="Amount Paid"
             value={`- ${money(invoice.balance.paid_amount)}`}
           />
+          {invoice.balance.show_previous_balance ? (
+            <SummaryRow
+              label="Previous Balance"
+              value={money(invoice.balance.previous_due_amount)}
+            />
+          ) : null}
           <div className="border-y border-dashed border-black py-2">
             <SummaryRow
               label="Balance Due"
-              value={money(invoice.balance.due_amount)}
+              value={money(invoice.balance.total_due_amount)}
               strong
             />
           </div>
@@ -185,7 +191,7 @@ export function InvoicePrint({ invoice }: { invoice: SaleInvoiceData }) {
                 UPI PAYMENT
               </p>
               <p className="mt-2 text-base font-semibold">
-                {money(invoice.balance.due_amount)}
+                {money(invoice.balance.total_due_amount)}
               </p>
               <p className="mt-2 max-w-44 text-[12px] text-zinc-600">
                 Scan QR to pay Narayani Traders

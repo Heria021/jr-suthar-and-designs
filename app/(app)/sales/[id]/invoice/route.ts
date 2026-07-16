@@ -336,9 +336,14 @@ export async function GET(
   y += 14
   doc.font(fonts.regular).fontSize(10).text("Amount Paid", sx, y)
   textRight(doc, `- ${money(invoice.balance.paid_amount)}`, 450, y, 110)
+  if (invoice.balance.show_previous_balance) {
+    y += 22
+    doc.text("Previous Balance", sx, y)
+    textRight(doc, money(invoice.balance.previous_due_amount), 450, y, 110)
+  }
   y += 26
   doc.font(fonts.bold).text("Balance Due", sx, y)
-  textRight(doc, money(invoice.balance.due_amount), 450, y, 110)
+  textRight(doc, money(invoice.balance.total_due_amount), 450, y, 110)
 
   const footerY = 636
   if (y + 28 > footerY) {
@@ -347,7 +352,7 @@ export async function GET(
       doc,
       footerY,
       qrImage,
-      dueAmount: invoice.balance.due_amount,
+      dueAmount: invoice.balance.total_due_amount,
       fonts,
     })
   } else {
@@ -355,7 +360,7 @@ export async function GET(
       doc,
       footerY,
       qrImage,
-      dueAmount: invoice.balance.due_amount,
+      dueAmount: invoice.balance.total_due_amount,
       fonts,
     })
   }
