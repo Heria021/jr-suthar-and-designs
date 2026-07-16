@@ -213,7 +213,7 @@ export async function GET(
   textRight(doc, "ESTIMATE INVOICE", 300, 34, 260)
   doc.fontSize(21)
   textRight(doc, invoice.sale.sale_number, 300, 50, 260)
-  doc.font(fonts.regular).fontSize(10)
+  doc.font(fonts.regular).fontSize(9)
   textRight(doc, `Date: ${invoiceDate}`, 300, 80, 260)
   textRight(
     doc,
@@ -223,32 +223,32 @@ export async function GET(
     260
   )
 
-  doc.lineWidth(1.5).moveTo(28, 122).lineTo(566, 122).stroke().lineWidth(1)
-  doc.font(fonts.bold).fontSize(8).text("FROM", 28, 136, { characterSpacing: 1.5 })
-  doc.fontSize(10).text(businessProfile.name, 28, 154)
+  doc.lineWidth(1.5).moveTo(28, 114).lineTo(566, 114).stroke().lineWidth(1)
+  doc.font(fonts.bold).fontSize(8).text("FROM", 28, 126, { characterSpacing: 1.5 })
+  doc.fontSize(10).text(businessProfile.name, 28, 142)
   doc.font(fonts.regular).fontSize(9)
   businessProfile.addressLines.forEach((line, index) => {
-    doc.text(line, 28, 172 + index * 13)
+    doc.text(line, 28, 158 + index * 12)
   })
 
-  doc.font(fonts.bold).fontSize(8).text("BILL TO", 300, 136, { characterSpacing: 1.5 })
-  doc.fontSize(10).text(invoice.customer.name, 300, 154)
+  doc.font(fonts.bold).fontSize(8).text("BILL TO", 300, 126, { characterSpacing: 1.5 })
+  doc.fontSize(10).text(invoice.customer.name, 300, 142)
   doc.font(fonts.regular)
-  let billToY = 172
+  let billToY = 158
   if (invoice.customer.address) {
     const addressHeight = doc.heightOfString(invoice.customer.address, { width: 240 })
     doc.text(invoice.customer.address, 300, billToY, { width: 240 })
-    billToY += Math.max(13, addressHeight + 3)
+    billToY += Math.max(12, addressHeight + 2)
   }
   doc.text(`Phone: ${invoice.customer.phone ?? "-"}`, 300, billToY)
   if (invoice.customer.notes) {
-    doc.fillColor("#555555").text(`Notes: ${invoice.customer.notes}`, 300, billToY + 15, {
+    doc.fillColor("#555555").text(`Notes: ${invoice.customer.notes}`, 300, billToY + 13, {
       width: 240,
     })
     doc.fillColor("#000000")
   }
 
-  let y = drawItemsHeader(doc, 226, fonts)
+  let y = drawItemsHeader(doc, 202, fonts)
   invoice.items.forEach((item, index) => {
     const srText = String(index + 1).padStart(2, "0")
     const quantityText = quantityLabel(item)
