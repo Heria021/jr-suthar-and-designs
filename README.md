@@ -9,13 +9,51 @@ The project is designed as a serious internal tool rather than a demo dashboard.
 
 ## Product Screenshots
 
-Replace these placeholders with real screenshots before sharing the repository publicly.
+### Narayani Traders ERP
 
-![ERP overview dashboard placeholder](docs/screenshots/erp-overview.svg)
+<table>
+  <tr>
+    <td width="50%">
+      <img src="public/readme/erp-dashboard.png" alt="Narayani Traders ERP overview dashboard" />
+      <br />
+      <sub><strong>ERP overview</strong> with sales, collections, supplier payables, and stock health.</sub>
+    </td>
+    <td width="50%">
+      <img src="public/readme/erp-products.png" alt="Narayani Traders ERP product inventory table" />
+      <br />
+      <sub><strong>Inventory control</strong> with products, stock, reorder levels, unit pricing, and box packaging.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="public/readme/erp-sales-list.png" alt="Narayani Traders ERP sales list with invoice status" />
+      <br />
+      <sub><strong>Sales and billing</strong> with draft, pending, partial, paid, and cancelled invoice states.</sub>
+    </td>
+    <td width="50%">
+      <img src="public/readme/erp-contact-statement.png" alt="Narayani Traders ERP contact account statement" />
+      <br />
+      <sub><strong>Account statements</strong> with customer/supplier balances, payment history, and running ledger.</sub>
+    </td>
+  </tr>
+</table>
 
-![Billing and invoice workflow placeholder](docs/screenshots/billing-invoice-workflow.svg)
+### JR Suthar & Designs
 
-![Architecture portfolio workspace placeholder](docs/screenshots/architecture-portfolio-workspace.svg)
+<table>
+  <tr>
+    <td width="50%">
+      <img src="public/readme/architecture-dashboard.png" alt="JR Suthar and Designs architecture dashboard project grid" />
+      <br />
+      <sub><strong>Architecture dashboard</strong> with searchable project cards, visibility state, and featured work.</sub>
+    </td>
+    <td width="50%">
+      <img src="public/readme/architecture-project-detail.png" alt="JR Suthar and Designs project detail and media manager" />
+      <br />
+      <sub><strong>Project media workspace</strong> with client details, cover image control, and gallery management.</sub>
+    </td>
+  </tr>
+</table>
 
 ## Why This Exists
 
@@ -283,22 +321,6 @@ npm run backend:test
 ```
 
 Important: review migrations before applying them to an existing database. This repository includes ERP reset migrations used during development and production cleanup. Architecture portfolio tables are intentionally preserved by the latest ERP-only reset migration.
-
-## Suggested Screenshots To Add
-
-Use these exact file paths to replace the placeholders without editing the README:
-
-```text
-docs/screenshots/erp-overview.svg
-docs/screenshots/billing-invoice-workflow.svg
-docs/screenshots/architecture-portfolio-workspace.svg
-```
-
-Recommended final captures:
-
-- **ERP overview**: collapsed sidebar, workspace switcher, weekly sales chart, collection donut, purchase payments donut, and attention lists.
-- **Billing workflow**: `/sales/new` with customer quick fields, product rows, payment/totals section, plus the invoice preview/download page.
-- **Architecture workspace**: JR Suthar project grid or project detail with media upload, cover image, public flags, and public landing page preview.
 
 ## Current Status
 
