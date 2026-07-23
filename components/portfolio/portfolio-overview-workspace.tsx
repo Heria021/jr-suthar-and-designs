@@ -115,7 +115,7 @@ export function PortfolioOverviewWorkspace({
         </div>
 
         {filtered.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {filtered.map((project) => (
               <button
                 key={project.id}
@@ -196,4 +196,3 @@ export function PortfolioOverviewWorkspace({
     </div>
   )
 }
-
